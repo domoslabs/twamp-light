@@ -151,22 +151,23 @@ void print_sta_info(char* interface, char* mac){
       reason not to do so is an inability to access the TTL field of
       arriving packets), it MUST set the Sender TTL value as 255.
  */
-IPHeader get_ip_header(msghdr *message){
+IPHeader get_ip_header(msghdr hdr){
     /* Get TTL/TOS values from IP header */
-    uint8_t fw_ttl = 0;
-    uint8_t fw_tos = 0;
-    struct cmsghdr *c_msg;
+    uint8_t ttl = 0;
+    uint8_t tos = 0;
+
 #ifndef NO_MESSAGE_CONTROL
-    for (c_msg = CMSG_FIRSTHDR(message); c_msg;
-         c_msg = (CMSG_NXTHDR(message, c_msg))) {
+    struct cmsghdr *c_msg;
+    for (c_msg = CMSG_FIRSTHDR(&hdr); c_msg;
+         c_msg = (CMSG_NXTHDR(&hdr, c_msg))) {
         if ((c_msg->cmsg_level == IPPROTO_IP && c_msg->cmsg_type == IP_TTL)
             || (c_msg->cmsg_level == IPPROTO_IPV6
                 && c_msg->cmsg_type == IPV6_HOPLIMIT)) {
-            fw_ttl = *(int *)CMSG_DATA(c_msg);
+            ttl = *(int *)CMSG_DATA(c_msg);
 
         } else if (c_msg->cmsg_level == IPPROTO_IP
                    && c_msg->cmsg_type == IP_TOS) {
-            fw_tos = *(int *)CMSG_DATA(c_msg);
+            tos = *(int *)CMSG_DATA(c_msg);
 
         } else {
             fprintf(stderr,
@@ -174,17 +175,15 @@ IPHeader get_ip_header(msghdr *message){
                     c_msg->cmsg_level, c_msg->cmsg_type);
         }
     }
-    IPHeader ipHeader = {
-            fw_ttl,
-            fw_tos
-    };
-    return ipHeader;
 #else
     fprintf(stdout,
             "No message control on that platform, so no way to find IP options\n");
-    return nullptr;
 #endif
-
+    IPHeader ipHeader = {
+            ttl,
+            tos
+    };
+    return ipHeader;
 }
 uint64_t print_metrics(char* server, uint16_t snd_port, uint16_t rcv_port, uint8_t snd_tos,
                        uint8_t sw_ttl, uint8_t sw_tos,
@@ -265,7 +264,7 @@ void print_metrics_server(char *addr_cl, uint16_t snd_port, uint16_t rcv_port,
             fw_tos, (double)intd1 * 1e-3, (double)fwd1 * 1e-3);
 
 }
-void set_socket_ttl(int socket, uint8_t ip_ttl)
+void set_socket_options(int socket, uint8_t ip_ttl)
 {
     /* Set socket options : timeout, IPTTL, IP_RECVTTL, IP_RECVTOS */
     uint8_t One = 1;

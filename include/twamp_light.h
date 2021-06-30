@@ -9,7 +9,7 @@
 #define HDR_TTL		255         /* TTL=255 in TWAMP for IP Header */
 #define SERVER_PORT 862
 #define CHECK_TIMES 100
-#define LOSTTIME	2           /* SECONDS - Timeout for TWAMP test packet */
+#define LOSTTIME	20          /* SECONDS - Timeout for TWAMP test packet */
 
 /* TWAMP timestamp is NTP time (RFC1305).
  * Should be in network byte order!      */
@@ -55,7 +55,7 @@ uint64_t get_usec(const TWAMPTimestamp * ts);
 
 TWAMPTimestamp get_timestamp();
 
-IPHeader get_ip_header(msghdr *message);
+IPHeader get_ip_header(msghdr message);
 
 uint64_t print_metrics(char *server, uint16_t snd_port, uint16_t rcv_port, uint8_t snd_tos,
                        uint8_t sw_ttl, uint8_t sw_tos,
@@ -65,7 +65,7 @@ uint64_t print_metrics(char *server, uint16_t snd_port, uint16_t rcv_port, uint8
 void print_metrics_server(char *addr_cl, uint16_t snd_port, uint16_t rcv_port,
                           uint8_t snd_tos, uint8_t fw_tos,
                           const ReflectorPacket * pack);
-void set_socket_ttl(int socket, uint8_t ip_ttl);
+void set_socket_options(int socket, uint8_t ip_ttl);
 
 
 #endif //DOMOS_TWAMP_LIGHT_TWAMP_LIGHT_H

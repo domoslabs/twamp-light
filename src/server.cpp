@@ -6,43 +6,82 @@
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <netinet/in.h>
+#include <getopt.h>
 #include "twamp_light.h"
-const char* local_host = "127.0.0.1"; // Does not matter, use wildcard
+const char* local_host = nullptr; // Does not matter, use wildcard
 const char* local_port = "443";
+void show_help(char* progname){
+    std::cout << "\nTwamp-Light implementation written by Vladimir Monakhov. \n" << std::endl;
+    std::cout << "Usage: " << progname << " [--local_address] [--local_port] [--help]"<< std::endl;
+    std::cout << "-a    --local_address           The address to set up the local socket on.          (Optional, not needed in most cases)" << std::endl;
+    std::cout << "-P    --local_port              The port to set up the local socket on.             (Default: " << local_port << ")" << std::endl;
+    std::cout << "-h    --help                    Show this message." << std::endl;
+}
+void parse_args(int argc, char **argv){
+    const char *shortopts = "a:p:h";
+    const struct option longopts[] = {
+            {"local_address", required_argument, 0, 'a'},
+            {"local_port", required_argument, 0, 'P'},
+            {"help", no_argument, 0, 'h'},
+            {0, 0, 0, 0},
+    };
+    int c, option_index;
+    while ((c = getopt_long(argc, argv, shortopts, longopts, &option_index)) != -1)
+        switch (c)
+        {
+            case 'a':
+                local_host = optarg;
+                break;
+            case 'h':
+                show_help(argv[0]);
+                std::exit(EXIT_SUCCESS);
+            case 'P':
+                local_port = optarg;
+                break;
+            default:
+                std::cerr << "Invalid argument: " << c << ". See --help" << std::endl;
+                std::exit(EXIT_FAILURE);
+        }
+}
 ReflectorPacket craft_reflector_packet(SenderPacket *sender_packet, msghdr sender_msg){
+    IPHeader ipHeader = get_ip_header(sender_msg);
     ReflectorPacket packet;
     packet.receive_time = get_timestamp();
-    // Reflect the seq number as is defined in https://tools.ietf.org/id/draft-mirsky-ippm-twamp-light-yang-09.html
     packet.seq_number = sender_packet->seq_number;
     packet.sender_seq_number = sender_packet->seq_number;
     packet.sender_time = sender_packet->time;
     packet.sender_error_estimate = sender_packet->error_estimate;
-    IPHeader ipHeader = get_ip_header(&sender_msg);
+
     packet.sender_ttl = ipHeader.ttl;
     packet.sender_tos = ipHeader.tos;
-    packet.error_estimate = htons(0x8001);    // Sync = 1, Multiplier = 1
+    packet.error_estimate = htons(0x8001);    // Sync = 1, Multiplier = 1 Taken from TWAMP C implementation.
     packet.time = get_timestamp();
     return packet;
 }
 void handle_test_packet(SenderPacket *packet, msghdr sender_msg, int fd){
     std::cout << htonl(packet->seq_number) << std::endl;
     //std::cout << packet->time << std::endl;
-    std::cout << packet->error_estimate << std::endl;
+    IPHeader ipHeader = get_ip_header(sender_msg);
+    std::cout << unsigned(ipHeader.ttl) << std::endl;
     ReflectorPacket reflector_packet = craft_reflector_packet(packet, sender_msg);
 
     struct iovec iov[1];
     iov[0].iov_base=&reflector_packet;
     iov[0].iov_len=sizeof(reflector_packet);
 
-
+    if (sendmsg(fd,&sender_msg,0)==-1) {
+        std::cerr << strerror(errno) << std::endl;
+        return;
+    }
     if (sendmsg(fd,&sender_msg,0)==-1) {
         std::cerr << strerror(errno) << std::endl;
         return;
     }
 }
-int main() {
+int main(int argc, char **argv) {
+    parse_args(argc, argv);
 
-    std::cout << "Running Server" << std::endl;
+    std::cout << "Running Server on port " << local_port << std::endl;
     // Construct socket address
     struct addrinfo hints;
     memset(&hints,0,sizeof(hints));
@@ -61,15 +100,16 @@ int main() {
     int fd=socket(res->ai_family,res->ai_socktype,res->ai_protocol);
     if (fd==-1) {
         std::cerr << strerror(errno) << std::endl;
-        return 0;
+        return -1;
     }
-
+    // Setup the socket options, to be able to receive TTL and TOS
+    set_socket_options(fd, HDR_TTL);
     // Bind the socket
     if (bind(fd,res->ai_addr,res->ai_addrlen)==-1) {
         std::cerr << strerror(errno) << std::endl;
-        return 0;
+        return -1;
     }
-    // Free the socket address info, since it is no longer needed.
+    // Free the socket address info, since it is no longer needed. ??
     freeaddrinfo(res);
 
     // Read incoming datagrams
@@ -80,14 +120,15 @@ int main() {
         struct iovec iov[1];
         iov[0].iov_base=buffer;
         iov[0].iov_len=sizeof(buffer);
+        uint8_t ctrlDataBuffer[CMSG_SPACE(sizeof(uint8_t))];
 
         struct msghdr message{};
         message.msg_name=&src_addr;
         message.msg_namelen=sizeof(&src_addr);
         message.msg_iov=iov;
         message.msg_iovlen=1;
-        message.msg_control= nullptr;
-        message.msg_controllen=0;
+        message.msg_control= ctrlDataBuffer;
+        message.msg_controllen=sizeof(ctrlDataBuffer);
 
         ssize_t count=recvmsg(fd,&message,0);
         if (count==-1) {
@@ -101,5 +142,4 @@ int main() {
             handle_test_packet(rec, message, fd);
         }
     }
-    return 0;
 }
