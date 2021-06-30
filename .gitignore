@@ -1,0 +1,9 @@
+twamp_light_client
+twamp_light_server
+domos_twamp_light.cbp
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+.idea/
+CMakeFiles
+cmake-build-debug/
