@@ -44,36 +44,32 @@ void parse_args(int argc, char **argv){
         }
 }
 ReflectorPacket craft_reflector_packet(SenderPacket *sender_packet, msghdr sender_msg){
-    IPHeader ipHeader = get_ip_header(sender_msg);
-    ReflectorPacket packet;
+
+    ReflectorPacket packet = {};
     packet.receive_time = get_timestamp();
     packet.seq_number = sender_packet->seq_number;
     packet.sender_seq_number = sender_packet->seq_number;
     packet.sender_time = sender_packet->time;
     packet.sender_error_estimate = sender_packet->error_estimate;
-
+    IPHeader ipHeader = get_ip_header(sender_msg);
     packet.sender_ttl = ipHeader.ttl;
     packet.sender_tos = ipHeader.tos;
+    std::cout << get_usec(&packet.receive_time)- get_usec(&packet.sender_time) << std::endl;
     packet.error_estimate = htons(0x8001);    // Sync = 1, Multiplier = 1 Taken from TWAMP C implementation.
     packet.time = get_timestamp();
     return packet;
 }
 void handle_test_packet(SenderPacket *packet, msghdr sender_msg, int fd){
-    std::cout << htonl(packet->seq_number) << std::endl;
-    //std::cout << packet->time << std::endl;
-    IPHeader ipHeader = get_ip_header(sender_msg);
-    std::cout << unsigned(ipHeader.ttl) << std::endl;
     ReflectorPacket reflector_packet = craft_reflector_packet(packet, sender_msg);
-
+    // Overwrite and reuse the sender message with our own data and send it back, instead of creating a new one.
+    msghdr message = sender_msg;
     struct iovec iov[1];
     iov[0].iov_base=&reflector_packet;
     iov[0].iov_len=sizeof(reflector_packet);
+    message.msg_iov=iov;
+    message.msg_iovlen=1;
 
-    if (sendmsg(fd,&sender_msg,0)==-1) {
-        std::cerr << strerror(errno) << std::endl;
-        return;
-    }
-    if (sendmsg(fd,&sender_msg,0)==-1) {
+    if (sendmsg(fd,&message,0)==-1) {
         std::cerr << strerror(errno) << std::endl;
         return;
     }
@@ -83,7 +79,7 @@ int main(int argc, char **argv) {
 
     std::cout << "Running Server on port " << local_port << std::endl;
     // Construct socket address
-    struct addrinfo hints;
+    struct addrinfo hints = {};
     memset(&hints,0,sizeof(hints));
     hints.ai_family=AF_INET; //TODO IPv6
     hints.ai_socktype=SOCK_DGRAM;

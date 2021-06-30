@@ -57,7 +57,7 @@ TWAMPTimestamp get_timestamp();
 
 IPHeader get_ip_header(msghdr message);
 
-uint64_t print_metrics(char *server, uint16_t snd_port, uint16_t rcv_port, uint8_t snd_tos,
+uint64_t print_metrics(const char *server, uint16_t snd_port, uint16_t rcv_port, uint8_t snd_tos,
                        uint8_t sw_ttl, uint8_t sw_tos,
                        TWAMPTimestamp * recv_resp_time,
                        const ReflectorPacket * pack, uint16_t plen, char* device_mac, char* radio_interface);

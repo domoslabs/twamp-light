@@ -12,29 +12,29 @@
  */
 
 #include "twamp_light.h"
+#include "fort.hpp"
 #include <inttypes.h>
 #include <sys/time.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <stdio.h>
 #include <string.h>
+#include <iostream>
 
-void timeval_to_timestamp(const struct timeval *tv, TWAMPTimestamp * ts)
-{
+void timeval_to_timestamp(const struct timeval *tv, TWAMPTimestamp *ts) {
     if (!tv || !ts)
         return;
 
     /* Unix time to NTP */
     ts->integer = tv->tv_sec + 2208988800uL;
-    ts->fractional = (uint32_t) ((double)tv->tv_usec * ((double)(1uLL << 32)
-                                                        / (double)1e6));
+    ts->fractional = (uint32_t) ((double) tv->tv_usec * ((double) (1uLL << 32)
+                                                         / (double) 1e6));
 
     ts->integer = htonl(ts->integer);
     ts->fractional = htonl(ts->fractional);
 }
 
-void timestamp_to_timeval(const TWAMPTimestamp * ts, struct timeval *tv)
-{
+void timestamp_to_timeval(const TWAMPTimestamp *ts, struct timeval *tv) {
     if (!tv || !ts)
         return;
 
@@ -45,12 +45,11 @@ void timestamp_to_timeval(const TWAMPTimestamp * ts, struct timeval *tv)
 
     /* NTP to Unix time */
     tv->tv_sec = ts_host_ord.integer - 2208988800uL;
-    tv->tv_usec = (uint32_t) (double)ts_host_ord.fractional * (double)1e6
-                  / (double)(1uLL << 32);
+    tv->tv_usec = (uint32_t) (double) ts_host_ord.fractional * (double) 1e6
+                  / (double) (1uLL << 32);
 }
 
-TWAMPTimestamp get_timestamp()
-{
+TWAMPTimestamp get_timestamp() {
     struct timeval tv;
     gettimeofday(&tv, NULL);
     TWAMPTimestamp ts;
@@ -58,35 +57,34 @@ TWAMPTimestamp get_timestamp()
     return ts;
 }
 
-uint64_t get_usec(const TWAMPTimestamp * ts)
-{
+uint64_t get_usec(const TWAMPTimestamp *ts) {
     struct timeval tv;
     timestamp_to_timeval(ts, &tv);
-    return (uint64_t)tv.tv_sec * 1000000 + (uint64_t)tv.tv_usec;
+    return (uint64_t) tv.tv_sec * 1000000 + (uint64_t) tv.tv_usec;
 }
 
-void print_chanims_stats(char* interface){
+void print_chanims_stats(char *interface) {
     FILE *fp;
     char path[1035];
     char command[128];
     sprintf(command, "/usr/sbin/wlctl -i %s chanim_stats", interface);
     fp = popen(command, "r");
-    if( fp == NULL){
+    if (fp == NULL) {
         printf("Failed to run wlctl chanim_stats\n");
-    }else{
+    } else {
         int line = 0;
-        while(fgets(path, sizeof(path)-1,fp) != NULL){
-            if(line == 2){
-                for(int i = 0; i<1035; i++){
-                    if(path[i] == '\t'){
+        while (fgets(path, sizeof(path) - 1, fp) != NULL) {
+            if (line == 2) {
+                for (int i = 0; i < 1035; i++) {
+                    if (path[i] == '\t') {
                         path[i] = ',';
-                    }else if(path[i] == 0){
+                    } else if (path[i] == 0) {
                         break;
-                    }else if(path[i] == '\n'){
+                    } else if (path[i] == '\n') {
                         path[i] = ',';
                     }
                 }
-                fprintf(stderr,"%s", path);
+                fprintf(stderr, "%s", path);
             }
             line++;
         }
@@ -94,41 +92,41 @@ void print_chanims_stats(char* interface){
     }
 }
 
-void print_sta_info(char* interface, char* mac){
+void print_sta_info(char *interface, char *mac) {
     FILE *fp;
     char path[1035];
     char command[128];
     sprintf(command, "/usr/sbin/wlctl -i %s sta_info %s", interface, mac);
     fp = popen(command, "r");
-    if( fp == NULL){
+    if (fp == NULL) {
         printf("Failed to run %s\n", command);
-    } else{
+    } else {
         int line = 0;
-        while(fgets(path, sizeof(path)-1,fp) != NULL){
+        while (fgets(path, sizeof(path) - 1, fp) != NULL) {
             line++;
-            if(line <= 8) continue;
+            if (line <= 8) continue;
             if (line >= 37) break;
 
-            char* point = strchr(path, ':');
-            if(point  == NULL){
+            char *point = strchr(path, ':');
+            if (point == NULL) {
                 continue;
             }
             point += 2;
-            char* tmp = point;
-            if(line == 22 || line == 23){
-                while(*tmp != 0){
-                    if(*tmp == ' '){
+            char *tmp = point;
+            if (line == 22 || line == 23) {
+                while (*tmp != 0) {
+                    if (*tmp == ' ') {
                         *tmp = 0;
                         break;
                     }
                     tmp++;
                 }
-            } else{
-                while(*tmp != 0){
-                    if(*tmp == ' '){
+            } else {
+                while (*tmp != 0) {
+                    if (*tmp == ' ') {
                         *tmp = ',';
                     }
-                    if(*tmp == '\n'){
+                    if (*tmp == '\n') {
                         *tmp = 0;
                         break;
                     }
@@ -136,7 +134,7 @@ void print_sta_info(char* interface, char* mac){
                 }
             }
 
-            fprintf(stderr,"%s,", point);
+            fprintf(stderr, "%s,", point);
 
         }
         pclose(fp);
@@ -151,9 +149,9 @@ void print_sta_info(char* interface, char* mac){
       reason not to do so is an inability to access the TTL field of
       arriving packets), it MUST set the Sender TTL value as 255.
  */
-IPHeader get_ip_header(msghdr hdr){
+IPHeader get_ip_header(msghdr hdr) {
     /* Get TTL/TOS values from IP header */
-    uint8_t ttl = 0;
+    uint8_t ttl = 255;
     uint8_t tos = 0;
 
 #ifndef NO_MESSAGE_CONTROL
@@ -163,11 +161,11 @@ IPHeader get_ip_header(msghdr hdr){
         if ((c_msg->cmsg_level == IPPROTO_IP && c_msg->cmsg_type == IP_TTL)
             || (c_msg->cmsg_level == IPPROTO_IPV6
                 && c_msg->cmsg_type == IPV6_HOPLIMIT)) {
-            ttl = *(int *)CMSG_DATA(c_msg);
+            ttl = *(int *) CMSG_DATA(c_msg);
 
         } else if (c_msg->cmsg_level == IPPROTO_IP
                    && c_msg->cmsg_type == IP_TOS) {
-            tos = *(int *)CMSG_DATA(c_msg);
+            tos = *(int *) CMSG_DATA(c_msg);
 
         } else {
             fprintf(stderr,
@@ -185,11 +183,11 @@ IPHeader get_ip_header(msghdr hdr){
     };
     return ipHeader;
 }
-uint64_t print_metrics(char* server, uint16_t snd_port, uint16_t rcv_port, uint8_t snd_tos,
+
+uint64_t print_metrics(const char *server, uint16_t snd_port, uint16_t rcv_port, uint8_t snd_tos,
                        uint8_t sw_ttl, uint8_t sw_tos,
-                       TWAMPTimestamp * recv_resp_time,
-                       const ReflectorPacket * pack, uint16_t plen, char* device_mac, char* radio_interface)
-{
+                       TWAMPTimestamp *recv_resp_time,
+                       const ReflectorPacket *pack, uint16_t plen, char *device_mac, char *radio_interface) {
     /* Compute timestamps in usec */
     uint64_t t_sender_usec = get_usec(&pack->sender_time);
     uint64_t t_receive_usec = get_usec(&pack->receive_time);
@@ -197,8 +195,8 @@ uint64_t print_metrics(char* server, uint16_t snd_port, uint16_t rcv_port, uint8
     uint64_t t_recvresp_usec = get_usec(recv_resp_time);
 
     /* Compute delays */
-    int64_t fwd =  t_receive_usec - t_sender_usec;
-    int64_t swd =  t_recvresp_usec - t_reflsender_usec;
+    int64_t fwd = t_receive_usec - t_sender_usec;
+    int64_t swd = t_recvresp_usec - t_reflsender_usec;
     int64_t intd = t_reflsender_usec - t_receive_usec;
     char sync = 'Y';
     if ((fwd < 0) || (swd < 0)) {
@@ -212,29 +210,30 @@ uint64_t print_metrics(char* server, uint16_t snd_port, uint16_t rcv_port, uint8
     if (device_mac != NULL && radio_interface != NULL) {
         print_chanims_stats(radio_interface);
         print_sta_info(radio_interface, device_mac);
-        fprintf(stderr,"%s,%s,", device_mac, radio_interface);
+        fprintf(stdout, "%s,%s,", device_mac, radio_interface);
     }
-
-
-    fprintf(stderr,
-            "%.0f,%s,%d,%d,%d,%d,%c,%d,%d,%d,%c,%d,"
-            "%.3f,%.3f,%.3f,%.3f,%d\n",
-            (double)t_sender_usec * 1e-3, server, snd_sn, rcv_sn, snd_port,
-            rcv_port, sync, pack->sender_ttl, sw_ttl, snd_tos, '-', sw_tos,
-            (double)(fwd + swd) * 1e-3,
-            (double)(intd), (double)fwd * 1e-3, (double)swd * 1e-3, plen);
-
-
+    fort::char_table table;
+    table.set_border_style(FT_DOUBLE2_STYLE);
+    table << fort::header
+          << "Time"<< "IP"<< "Snd#"<< "Rcv#"<< "SndPt"<< "RscPt"<< "Sync"<< "FW_TTL"<<
+            "SW_TTL"<< "SndTOS"<< "FW_TOS"<< "SW_TOS"<< "NwRTD"<< "IntD [ms]"<< "FWD [ms]"<<
+            "SWD [ms]"<< "PLEN"
+          << fort::endr;
+    table << fort::header
+            << (double) t_sender_usec * 1e-3<< server<< snd_sn<< rcv_sn<< snd_port<<
+            rcv_port<< sync<< unsigned(pack->sender_ttl)<< unsigned(sw_ttl)<< '-'<< '-'<< '-'<<
+            (double) (fwd + swd) * 1e-3<<
+            (double) (intd)* 1e-3<< (double) fwd * 1e-3<< (double) swd * 1e-3<< plen
+          << fort::endr;
+    std::cout << table.to_string() << std::endl;
     return t_recvresp_usec - t_sender_usec;
 
 }
 
 
-
 void print_metrics_server(char *addr_cl, uint16_t snd_port, uint16_t rcv_port,
                           uint8_t snd_tos, uint8_t fw_tos,
-                          const ReflectorPacket * pack)
-{
+                          const ReflectorPacket *pack) {
 
     /* Compute timestamps in usec */
     uint64_t t_sender_usec1 = get_usec(&pack->sender_time);
@@ -259,24 +258,24 @@ void print_metrics_server(char *addr_cl, uint16_t snd_port, uint16_t rcv_port,
     /* Print different metrics */
     fprintf(stderr,
             "%s\t,%.0f\t, %3d\t, %d\t, %d\t, %d\t,  %c\t, %d\t, %d\t, %d\t, %.3f\t,"
-            " %.3f\n", addr_cl, (double)t_sender_usec1, snd_nb,
+            " %.3f\n", addr_cl, (double) t_sender_usec1, snd_nb,
             rcv_nb, snd_port, rcv_port, sync1, pack->sender_ttl, snd_tos,
-            fw_tos, (double)intd1 * 1e-3, (double)fwd1 * 1e-3);
+            fw_tos, (double) intd1 * 1e-3, (double) fwd1 * 1e-3);
 
 }
-void set_socket_options(int socket, uint8_t ip_ttl)
-{
+
+void set_socket_options(int socket, uint8_t ip_ttl) {
     /* Set socket options : timeout, IPTTL, IP_RECVTTL, IP_RECVTOS */
     uint8_t One = 1;
     int result;
 
     /* Set Timeout */
-    struct timeval timeout = { LOSTTIME, 0 };   //set timeout for 2 seconds
+    struct timeval timeout = {LOSTTIME, 0};   //set timeout for 2 seconds
 
     /* Set receive UDP message timeout value */
 #ifdef SO_RCVTIMEO
     result = setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO,
-                        (char *)&timeout, sizeof(struct timeval));
+                        (char *) &timeout, sizeof(struct timeval));
     if (result != 0) {
         fprintf(stderr,
                 "[PROBLEM] Cannot set the timeout value for reception.\n");

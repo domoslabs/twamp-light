@@ -61,20 +61,21 @@ void parse_args(int argc, char **argv){
     remote_host = argv[optind];
 }
 SenderPacket craft_sender_packet(){
-    SenderPacket packet;
+    SenderPacket packet = {};
     packet.seq_number = htonl(5); //TODO Use an index value or something here
     packet.time = get_timestamp();
     packet.error_estimate = htons(0x8001); // Sync = 1, Multiplier = 1.
     return packet;
 }
 void handle_reflector_packet(ReflectorPacket *reflectorPacket, msghdr msghdr, int fd) {
-    std::cout << htonl(reflectorPacket->seq_number) << std::endl;
+    IPHeader ipHeader = get_ip_header(msghdr);
+    TWAMPTimestamp ts = get_timestamp();
+    print_metrics(remote_host, 0, 0, 0, ipHeader.ttl, ipHeader.tos, &ts,
+                  reflectorPacket, 0, nullptr, nullptr);
 }
 int main(int argc, char **argv) {
     parse_args(argc, argv);
     std::cout << "Running Client on port " << local_port << std::endl;
-    std::cout << remote_port << std::endl;
-    std::cout << remote_host << std::endl;
 
     // Construct remote socket address
     struct addrinfo hints{};
