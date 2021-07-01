@@ -1,22 +1,28 @@
 # Twamp Light
 
 ## Installation
-Using cmake:
+Clone the repo and all its submodules:
+```bash
+git clone --recurse-submodules https://github.com/domoslabs/twamp-light.git 
+```
+Then using cmake:
 ```bash
 mkdir build
 cd build
 cmake ..
 make
 ```
-It will clone and build the libraries that it needs. Outputs a client and a server executable.
+This outputs a client and a server executable.
 
 Optional:
 ```bash
 make install
 ```
 ## Usage
-To see the help message:
+Requires root access.
+
+To show the help message:
 ```bash
 ./twamp-light-client -h
+./twamp-light-server -h
 ```
-Requires root access.
