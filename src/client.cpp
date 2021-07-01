@@ -170,7 +170,6 @@ void await_response(int fd){
 }
 int main(int argc, char **argv) {
     parse_args(argc, argv);
-    std::cout << "Running Client on port " << local_port << std::endl;
 
     // Construct remote socket address
     struct addrinfo hints{};

@@ -80,8 +80,6 @@ void handle_test_packet(SenderPacket *packet, msghdr sender_msg, int fd){
 }
 int main(int argc, char **argv) {
     parse_args(argc, argv);
-
-    std::cout << "Running Server on port " << local_port << std::endl;
     // Construct socket address
     struct addrinfo hints = {};
     memset(&hints,0,sizeof(hints));

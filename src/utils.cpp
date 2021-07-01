@@ -216,7 +216,7 @@ uint64_t print_metrics(const char *server, uint16_t snd_port, uint16_t rcv_port,
     fort::char_table table;
     table.set_border_style(FT_EMPTY_STYLE);
     table << fort::header
-            << "Time"<< "IP"<< "Snd#"<< "Rcv#"<< "SndPt"<< "RscPt"<< "Sync"<< "FW_TTL"
+            << "Time"<< "IP"<< "Snd#"<< "Rcv#"<< "SndPort"<< "RscPort"<< "Sync"<< "FW_TTL"
             << "SW_TTL"<< "SndTOS"<< "FW_TOS"<< "SW_TOS"<< "RTT [ms]"<< "IntD [ms]"
             << "FWD [ms]"<< "SWD [ms]"<< "PLEN"
           << fort::endr;
@@ -258,7 +258,7 @@ void print_metrics_server(const char *addr_cl, uint16_t snd_port, uint16_t rcv_p
     fort::char_table table;
     table.set_border_style(FT_EMPTY_STYLE);
     table << fort::header
-          << "Time" << "IP"<< "Snd#"<< "Rcv#"<< "SndPt"<< "RscPt"<< "Sync"<< "FW_TTL"
+          << "Time" << "IP"<< "Snd#"<< "Rcv#"<< "SndPort"<< "RscPort"<< "Sync"<< "FW_TTL"
           << "SndTOS"<< "FW_TOS"<< "IntD [ms]"<< "FWD [ms]"
           << fort::endr;
     table << fort::header
