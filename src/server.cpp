@@ -20,7 +20,7 @@ void show_help(char* progname){
     std::cout << "-h    --help                    Show this message." << std::endl;
 }
 void parse_args(int argc, char **argv){
-    const char *shortopts = "a:p:h";
+    const char *shortopts = "a:P:h";
     const struct option longopts[] = {
             {"local_address", required_argument, 0, 'a'},
             {"local_port", required_argument, 0, 'P'},
