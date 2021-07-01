@@ -7,4 +7,5 @@ Makefile
 .idea/
 CMakeFiles
 cmake-build-debug/
-third-party/
+third-party/**
+build/
