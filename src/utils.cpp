@@ -198,6 +198,7 @@ uint64_t print_metrics(const char *server, uint16_t snd_port, uint16_t rcv_port,
     int64_t fwd = t_receive_usec - t_sender_usec;
     int64_t swd = t_recvresp_usec - t_reflsender_usec;
     int64_t intd = t_reflsender_usec - t_receive_usec;
+    int64_t rtt = t_recvresp_usec - t_sender_usec;
     char sync = 'Y';
     if ((fwd < 0) || (swd < 0)) {
         sync = 'N';
@@ -213,25 +214,25 @@ uint64_t print_metrics(const char *server, uint16_t snd_port, uint16_t rcv_port,
         fprintf(stdout, "%s,%s,", device_mac, radio_interface);
     }
     fort::char_table table;
-    table.set_border_style(FT_DOUBLE2_STYLE);
+    table.set_border_style(FT_EMPTY_STYLE);
     table << fort::header
-          << "Time"<< "IP"<< "Snd#"<< "Rcv#"<< "SndPt"<< "RscPt"<< "Sync"<< "FW_TTL"<<
-            "SW_TTL"<< "SndTOS"<< "FW_TOS"<< "SW_TOS"<< "NwRTD"<< "IntD [ms]"<< "FWD [ms]"<<
-            "SWD [ms]"<< "PLEN"
+            << "Time"<< "IP"<< "Snd#"<< "Rcv#"<< "SndPt"<< "RscPt"<< "Sync"<< "FW_TTL"
+            << "SW_TTL"<< "SndTOS"<< "FW_TOS"<< "SW_TOS"<< "RTT [ms]"<< "IntD [ms]"
+            << "FWD [ms]"<< "SWD [ms]"<< "PLEN"
           << fort::endr;
     table << fort::header
-            << (double) t_sender_usec * 1e-3<< server<< snd_sn<< rcv_sn<< snd_port<<
-            rcv_port<< sync<< unsigned(pack->sender_ttl)<< unsigned(sw_ttl)<< '-'<< '-'<< '-'<<
-            (double) (fwd + swd) * 1e-3<<
-            (double) (intd)* 1e-3<< (double) fwd * 1e-3<< (double) swd * 1e-3<< plen
+            << std::fixed << (double) t_sender_usec * 1e-3<< server<< snd_sn<< rcv_sn<< snd_port
+            << rcv_port<< sync<< unsigned(pack->sender_ttl)<< unsigned(sw_ttl)
+            << unsigned(snd_tos)<< '-'<< unsigned(sw_tos)<<(double) rtt * 1e-3
+            <<(double) intd* 1e-3<< (double) fwd * 1e-3<< (double) swd * 1e-3<< plen
           << fort::endr;
-    std::cout << table.to_string() << std::endl;
+    std::cout << table.to_string() << std::flush;
     return t_recvresp_usec - t_sender_usec;
 
 }
 
 
-void print_metrics_server(char *addr_cl, uint16_t snd_port, uint16_t rcv_port,
+void print_metrics_server(const char *addr_cl, uint16_t snd_port, uint16_t rcv_port,
                           uint8_t snd_tos, uint8_t fw_tos,
                           const ReflectorPacket *pack) {
 
@@ -254,13 +255,18 @@ void print_metrics_server(char *addr_cl, uint16_t snd_port, uint16_t rcv_port,
     /* Sender TOS with ECN from FW TOS */
     snd_tos =
             snd_tos + (fw_tos & 0x3) - (((fw_tos & 0x2) >> 1) & (fw_tos & 0x1));
-
-    /* Print different metrics */
-    fprintf(stderr,
-            "%s\t,%.0f\t, %3d\t, %d\t, %d\t, %d\t,  %c\t, %d\t, %d\t, %d\t, %.3f\t,"
-            " %.3f\n", addr_cl, (double) t_sender_usec1, snd_nb,
-            rcv_nb, snd_port, rcv_port, sync1, pack->sender_ttl, snd_tos,
-            fw_tos, (double) intd1 * 1e-3, (double) fwd1 * 1e-3);
+    fort::char_table table;
+    table.set_border_style(FT_EMPTY_STYLE);
+    table << fort::header
+          << "Time" << "IP"<< "Snd#"<< "Rcv#"<< "SndPt"<< "RscPt"<< "Sync"<< "FW_TTL"
+          << "SndTOS"<< "FW_TOS"<< "IntD [ms]"<< "FWD [ms]"
+          << fort::endr;
+    table << fort::header
+            << std::fixed << (double) t_sender_usec1 << addr_cl  << snd_nb
+            <<rcv_nb << snd_port << rcv_port << sync1 << unsigned(pack->sender_ttl)<< unsigned(snd_tos)
+            <<unsigned(fw_tos) << (double) intd1 * 1e-3 << (double) fwd1 * 1e-3
+            << fort::endr;
+    std::cout << table.to_string() << std::flush;
 
 }
 
@@ -274,12 +280,12 @@ void set_socket_options(int socket, uint8_t ip_ttl) {
 
     /* Set receive UDP message timeout value */
 #ifdef SO_RCVTIMEO
-    result = setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO,
+/*    result = setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO,
                         (char *) &timeout, sizeof(struct timeval));
     if (result != 0) {
         fprintf(stderr,
                 "[PROBLEM] Cannot set the timeout value for reception.\n");
-    }
+    }*/
 #else
     fprintf(stderr,
             "No way to set the timeout value for incoming packets on that platform.\n");
@@ -307,7 +313,16 @@ void set_socket_options(int socket, uint8_t ip_ttl) {
     fprintf(stderr,
             "No way to ask for the TTL of incoming packets on that platform.\n");
 #endif
-
+#ifdef IP_TOS
+    result = setsockopt(socket, IPPROTO_IP, IP_TOS, &One, sizeof(One));
+    if (result != 0) {
+        fprintf(stderr,
+                "[PROBLEM] Cannot set the socket option for TOS reception.\n");
+    }
+#else
+    fprintf(stderr,
+            "No way to ask for the TOS of incoming packets on that platform.\n");
+#endif
     /* Set receive IP_TOS option */
 #ifdef IP_RECVTOS
     result = setsockopt(socket, IPPROTO_IP, IP_RECVTOS, &One, sizeof(One));
@@ -319,5 +334,20 @@ void set_socket_options(int socket, uint8_t ip_ttl) {
     fprintf(stderr,
             "No way to ask for the TOS of incoming packets on that platform.\n");
 #endif
+}
+void set_socket_tos(int socket, uint8_t ip_tos)
+{
+    /* Set socket options : IP_TOS */
+    int result;
 
+    /* Set IP TOS value */
+#ifdef IP_TOS
+    result = setsockopt(socket, IPPROTO_IP, IP_TOS, &ip_tos, sizeof(ip_tos));
+    if (result != 0) {
+        fprintf(stderr, "[PROBLEM] Cannot set the TOS value for emission.\n");
+    }
+#else
+    fprintf(stderr,
+            "No way to set the TOS value for leaving packets on that platform.\n");
+#endif
 }

@@ -62,10 +62,11 @@ uint64_t print_metrics(const char *server, uint16_t snd_port, uint16_t rcv_port,
                        TWAMPTimestamp * recv_resp_time,
                        const ReflectorPacket * pack, uint16_t plen, char* device_mac, char* radio_interface);
 
-void print_metrics_server(char *addr_cl, uint16_t snd_port, uint16_t rcv_port,
+void print_metrics_server(const char *addr_cl, uint16_t snd_port, uint16_t rcv_port,
                           uint8_t snd_tos, uint8_t fw_tos,
                           const ReflectorPacket * pack);
 void set_socket_options(int socket, uint8_t ip_ttl);
+void set_socket_tos(int socket, uint8_t ip_tos);
 
 
 #endif //DOMOS_TWAMP_LIGHT_TWAMP_LIGHT_H

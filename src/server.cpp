@@ -7,7 +7,9 @@
 #include <sys/uio.h>
 #include <netinet/in.h>
 #include <getopt.h>
+#include <arpa/inet.h>
 #include "twamp_light.h"
+#include "fort.hpp"
 const char* local_host = nullptr; // Does not matter, use wildcard
 const char* local_port = "443";
 void show_help(char* progname){
@@ -39,7 +41,7 @@ void parse_args(int argc, char **argv){
                 local_port = optarg;
                 break;
             default:
-                std::cerr << "Invalid argument: " << c << ". See --help" << std::endl;
+                std::cerr << "Invalid argument: " << c << ". See --help." << std::endl;
                 std::exit(EXIT_FAILURE);
         }
 }
@@ -54,7 +56,6 @@ ReflectorPacket craft_reflector_packet(SenderPacket *sender_packet, msghdr sende
     IPHeader ipHeader = get_ip_header(sender_msg);
     packet.sender_ttl = ipHeader.ttl;
     packet.sender_tos = ipHeader.tos;
-    std::cout << get_usec(&packet.receive_time)- get_usec(&packet.sender_time) << std::endl;
     packet.error_estimate = htons(0x8001);    // Sync = 1, Multiplier = 1 Taken from TWAMP C implementation.
     packet.time = get_timestamp();
     return packet;
@@ -62,6 +63,9 @@ ReflectorPacket craft_reflector_packet(SenderPacket *sender_packet, msghdr sende
 void handle_test_packet(SenderPacket *packet, msghdr sender_msg, int fd){
     ReflectorPacket reflector_packet = craft_reflector_packet(packet, sender_msg);
     // Overwrite and reuse the sender message with our own data and send it back, instead of creating a new one.
+    auto *hdr = (sockaddr_in *)sender_msg.msg_name;
+    char *ip = inet_ntoa(hdr->sin_addr);
+    print_metrics_server(ip, htons(hdr->sin_port), std::stoi(local_port), reflector_packet.sender_tos, 0, &reflector_packet);
     msghdr message = sender_msg;
     struct iovec iov[1];
     iov[0].iov_base=&reflector_packet;
@@ -100,6 +104,7 @@ int main(int argc, char **argv) {
     }
     // Setup the socket options, to be able to receive TTL and TOS
     set_socket_options(fd, HDR_TTL);
+    set_socket_tos(fd, 10);
     // Bind the socket
     if (bind(fd,res->ai_addr,res->ai_addrlen)==-1) {
         std::cerr << strerror(errno) << std::endl;
@@ -107,7 +112,6 @@ int main(int argc, char **argv) {
     }
     // Free the socket address info, since it is no longer needed. ??
     freeaddrinfo(res);
-
     // Read incoming datagrams
     while(true){
         char buffer[sizeof(SenderPacket)]; //We should only be receiving test_packets
@@ -116,15 +120,16 @@ int main(int argc, char **argv) {
         struct iovec iov[1];
         iov[0].iov_base=buffer;
         iov[0].iov_len=sizeof(buffer);
-        uint8_t ctrlDataBuffer[CMSG_SPACE(sizeof(uint8_t))];
+        char *control_buffer = (char *)malloc(TST_PKT_SIZE);
+        uint16_t control_length = TST_PKT_SIZE;
 
         struct msghdr message{};
         message.msg_name=&src_addr;
         message.msg_namelen=sizeof(&src_addr);
         message.msg_iov=iov;
         message.msg_iovlen=1;
-        message.msg_control= ctrlDataBuffer;
-        message.msg_controllen=sizeof(ctrlDataBuffer);
+        message.msg_control= control_buffer;
+        message.msg_controllen=control_length;
 
         ssize_t count=recvmsg(fd,&message,0);
         if (count==-1) {
@@ -133,7 +138,6 @@ int main(int argc, char **argv) {
         } else if (message.msg_flags&MSG_TRUNC) {
             std::cout << "Datagram too large for buffer: truncated" << std::endl;
         } else {
-            std::cout << "Received Datagram" << std::endl;
             auto *rec = (SenderPacket *)buffer;
             handle_test_packet(rec, message, fd);
         }
