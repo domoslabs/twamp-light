@@ -7,4 +7,3 @@ Makefile
 .idea/
 CMakeFiles
 cmake-build-debug/
-build/
