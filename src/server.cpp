@@ -13,7 +13,7 @@
 const char* local_host = nullptr; // Does not matter, use wildcard
 const char* local_port = "443";
 void show_help(char* progname){
-    std::cout << "\nTwamp-Light implementation written by Vladimir Monakhov. \n" << std::endl;
+    std::cout << "\nTwamp-Light implementation written by Domos. \n" << std::endl;
     std::cout << "Usage: " << progname << " [--local_address] [--local_port] [--help]"<< std::endl;
     std::cout << "-a    --local_address           The address to set up the local socket on.          (Optional, not needed in most cases)" << std::endl;
     std::cout << "-P    --local_port              The port to set up the local socket on.             (Default: " << local_port << ")" << std::endl;
