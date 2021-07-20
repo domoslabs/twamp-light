@@ -9,21 +9,25 @@
 #include <getopt.h>
 #include <arpa/inet.h>
 #include "twamp_light.h"
-#include "fort.hpp"
 const char* local_host = nullptr; // Does not matter, use wildcard
 const char* local_port = "443";
+const char* filename = nullptr;
+uint32_t num_packets = 10;
 void show_help(char* progname){
     std::cout << "\nTwamp-Light implementation written by Domos. \n" << std::endl;
     std::cout << "Usage: " << progname << " [--local_address] [--local_port] [--help]"<< std::endl;
     std::cout << "-a    --local_address           The address to set up the local socket on.          (Optional, not needed in most cases)" << std::endl;
     std::cout << "-P    --local_port              The port to set up the local socket on.             (Default: " << local_port << ")" << std::endl;
+    std::cout << "-n    --num_packets             The number of packets to receive.                   (Default: " << num_packets << ")" << std::endl;
+    std::cout << "-f    --file                    Save the output as a .csv formatted file. Disables terminal output." <<std::endl;
     std::cout << "-h    --help                    Show this message." << std::endl;
 }
 void parse_args(int argc, char **argv){
-    const char *shortopts = "a:P:h";
+    const char *shortopts = "a:P:n:f:h";
     const struct option longopts[] = {
             {"local_address", required_argument, 0, 'a'},
             {"local_port", required_argument, 0, 'P'},
+            {"file", required_argument, 0, 'f'},
             {"help", no_argument, 0, 'h'},
             {0, 0, 0, 0},
     };
@@ -39,6 +43,12 @@ void parse_args(int argc, char **argv){
                 std::exit(EXIT_SUCCESS);
             case 'P':
                 local_port = optarg;
+                break;
+            case 'n':
+                num_packets = std::stoi(optarg);
+                break;
+            case 'f':
+                filename = optarg;
                 break;
             default:
                 std::cerr << "Invalid argument: " << c << ". See --help." << std::endl;
@@ -60,12 +70,12 @@ ReflectorPacket craft_reflector_packet(SenderPacket *sender_packet, msghdr sende
     packet.time = get_timestamp();
     return packet;
 }
-void handle_test_packet(SenderPacket *packet, msghdr sender_msg, int fd){
+void handle_test_packet(SenderPacket *packet, msghdr sender_msg, int fd, std::ofstream& filestream){
     ReflectorPacket reflector_packet = craft_reflector_packet(packet, sender_msg);
     // Overwrite and reuse the sender message with our own data and send it back, instead of creating a new one.
     auto *hdr = (sockaddr_in *)sender_msg.msg_name;
     char *ip = inet_ntoa(hdr->sin_addr);
-    print_metrics_server(ip, htons(hdr->sin_port), std::stoi(local_port), reflector_packet.sender_tos, 0, &reflector_packet);
+    print_metrics_server(ip, htons(hdr->sin_port), std::stoi(local_port), reflector_packet.sender_tos, 0, &reflector_packet, filestream, filename);
     msghdr message = sender_msg;
     struct iovec iov[1];
     iov[0].iov_base=&reflector_packet;
@@ -80,6 +90,7 @@ void handle_test_packet(SenderPacket *packet, msghdr sender_msg, int fd){
 }
 int main(int argc, char **argv) {
     parse_args(argc, argv);
+    auto filestream = std::ofstream();
     // Construct socket address
     struct addrinfo hints = {};
     memset(&hints,0,sizeof(hints));
@@ -111,33 +122,34 @@ int main(int argc, char **argv) {
     // Free the socket address info, since it is no longer needed. ??
     freeaddrinfo(res);
     // Read incoming datagrams
-    while(true){
+    for(int i = 0; i < num_packets; i++) {
         char buffer[sizeof(SenderPacket)]; //We should only be receiving test_packets
         struct sockaddr *src_addr;
 
         struct iovec iov[1];
-        iov[0].iov_base=buffer;
-        iov[0].iov_len=sizeof(buffer);
-        char *control_buffer = (char *)malloc(TST_PKT_SIZE);
+        iov[0].iov_base = buffer;
+        iov[0].iov_len = sizeof(buffer);
+        char *control_buffer = (char *) malloc(TST_PKT_SIZE);
         uint16_t control_length = TST_PKT_SIZE;
 
         struct msghdr message{};
-        message.msg_name=&src_addr;
-        message.msg_namelen=sizeof(&src_addr);
-        message.msg_iov=iov;
-        message.msg_iovlen=1;
-        message.msg_control= control_buffer;
-        message.msg_controllen=control_length;
+        message.msg_name = &src_addr;
+        message.msg_namelen = sizeof(&src_addr);
+        message.msg_iov = iov;
+        message.msg_iovlen = 1;
+        message.msg_control = control_buffer;
+        message.msg_controllen = control_length;
 
-        ssize_t count=recvmsg(fd,&message,0);
-        if (count==-1) {
-            printf("%s",strerror(errno));
+        ssize_t count = recvmsg(fd, &message, 0);
+        if (count == -1) {
+            printf("%s", strerror(errno));
             return 0;
-        } else if (message.msg_flags&MSG_TRUNC) {
+        } else if (message.msg_flags & MSG_TRUNC) {
             std::cout << "Datagram too large for buffer: truncated" << std::endl;
         } else {
-            auto *rec = (SenderPacket *)buffer;
-            handle_test_packet(rec, message, fd);
+            auto *rec = (SenderPacket *) buffer;
+            handle_test_packet(rec, message, fd, filestream);
         }
     }
+    filestream.close();
 }

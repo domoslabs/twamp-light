@@ -6,6 +6,7 @@
 #define DOMOS_TWAMP_LIGHT_TWAMP_LIGHT_H
 #include <cstdint>
 #include <sys/socket.h>
+#include <fstream>
 #define HDR_TTL		255         /* TTL=255 in TWAMP for IP Header */
 #define SERVER_PORT 862
 #define CHECK_TIMES 100
@@ -57,14 +58,14 @@ TWAMPTimestamp get_timestamp();
 
 IPHeader get_ip_header(msghdr message);
 
-uint64_t print_metrics(const char *server, uint16_t snd_port, uint16_t rcv_port, uint8_t snd_tos,
-                       uint8_t sw_ttl, uint8_t sw_tos,
-                       TWAMPTimestamp * recv_resp_time,
-                       const ReflectorPacket * pack, uint16_t plen, char* device_mac, char* radio_interface);
+uint64_t
+print_metrics(const char *server, uint16_t snd_port, uint16_t rcv_port, uint8_t snd_tos, uint8_t sw_ttl, uint8_t sw_tos,
+              TWAMPTimestamp *recv_resp_time, const ReflectorPacket *pack, uint16_t plen, char *device_mac,
+              char *radio_interface, std::ofstream& filestream, const char *filename);
 
 void print_metrics_server(const char *addr_cl, uint16_t snd_port, uint16_t rcv_port,
                           uint8_t snd_tos, uint8_t fw_tos,
-                          const ReflectorPacket * pack);
+                          const ReflectorPacket * pack, std::ofstream &filestream, const char *filename);
 void set_socket_options(int socket, uint8_t ip_ttl);
 void set_socket_tos(int socket, uint8_t ip_tos);
 
