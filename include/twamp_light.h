@@ -10,7 +10,6 @@
 #define HDR_TTL		255         /* TTL=255 in TWAMP for IP Header */
 #define SERVER_PORT 862
 #define CHECK_TIMES 100
-#define LOSTTIME	20          /* SECONDS - Timeout for TWAMP test packet */
 
 /* TWAMP timestamp is NTP time (RFC1305).
  * Should be in network byte order!      */
@@ -66,7 +65,7 @@ print_metrics(const char *server, uint16_t snd_port, uint16_t rcv_port, uint8_t 
 void print_metrics_server(const char *addr_cl, uint16_t snd_port, uint16_t rcv_port,
                           uint8_t snd_tos, uint8_t fw_tos,
                           const ReflectorPacket * pack, std::ofstream &filestream, const char *filename);
-void set_socket_options(int socket, uint8_t ip_ttl);
+void set_socket_options(int socket, uint8_t ip_ttl, uint8_t timeout_secs);
 void set_socket_tos(int socket, uint8_t ip_tos);
 
 

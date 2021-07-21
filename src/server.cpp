@@ -12,21 +12,25 @@
 const char* local_host = nullptr; // Does not matter, use wildcard
 const char* local_port = "443";
 const char* filename = nullptr;
+uint8_t timeout = 10;
 uint32_t num_packets = 10;
 void show_help(char* progname){
     std::cout << "\nTwamp-Light implementation written by Domos. \n" << std::endl;
     std::cout << "Usage: " << progname << " [--local_address] [--local_port] [--help]"<< std::endl;
-    std::cout << "-a    --local_address           The address to set up the local socket on.          (Optional, not needed in most cases)" << std::endl;
-    std::cout << "-P    --local_port              The port to set up the local socket on.             (Default: " << local_port << ")" << std::endl;
-    std::cout << "-n    --num_packets             The number of packets to receive.                   (Default: " << num_packets << ")" << std::endl;
+    std::cout << "-a    --local_address           The address to set up the local socket on.                            (Optional, not needed in most cases)" << std::endl;
+    std::cout << "-P    --local_port              The port to set up the local socket on.                               (Default: " << local_port << ")" << std::endl;
+    std::cout << "-n    --num_packets             The number of packets to receive.                                     (Default: " << num_packets << ")" << std::endl;
+    std::cout << "-t    --timeout                 How long to keep the socket open, when no response is received.       (Default: " << timeout << ")" << std::endl;
     std::cout << "-f    --file                    Save the output as a .csv formatted file. Disables terminal output." <<std::endl;
     std::cout << "-h    --help                    Show this message." << std::endl;
 }
 void parse_args(int argc, char **argv){
-    const char *shortopts = "a:P:n:f:h";
+    const char *shortopts = "a:P:n:t:f:h";
     const struct option longopts[] = {
             {"local_address", required_argument, 0, 'a'},
             {"local_port", required_argument, 0, 'P'},
+            {"num_packets", required_argument, 0, 'n'},
+            {"timeout", required_argument, 0, 't'},
             {"file", required_argument, 0, 'f'},
             {"help", no_argument, 0, 'h'},
             {0, 0, 0, 0},
@@ -46,6 +50,9 @@ void parse_args(int argc, char **argv){
                 break;
             case 'n':
                 num_packets = std::stoi(optarg);
+                break;
+            case 't':
+                timeout = std::stoi(optarg);
                 break;
             case 'f':
                 filename = optarg;
@@ -112,7 +119,7 @@ int main(int argc, char **argv) {
         return -1;
     }
     // Setup the socket options, to be able to receive TTL and TOS
-    set_socket_options(fd, HDR_TTL);
+    set_socket_options(fd, HDR_TTL, timeout);
     set_socket_tos(fd, 10);
     // Bind the socket
     if (bind(fd,res->ai_addr,res->ai_addrlen)==-1) {
@@ -142,7 +149,12 @@ int main(int argc, char **argv) {
 
         ssize_t count = recvmsg(fd, &message, 0);
         if (count == -1) {
-            printf("%s", strerror(errno));
+            if(errno == 11){
+                std::cerr << "Socket timed out." << std::endl;
+                std::exit(EXIT_FAILURE);
+            } else {
+                printf("%s", strerror(errno));
+            }
             return 0;
         } else if (message.msg_flags & MSG_TRUNC) {
             std::cout << "Datagram too large for buffer: truncated" << std::endl;

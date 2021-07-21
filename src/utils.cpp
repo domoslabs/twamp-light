@@ -298,22 +298,22 @@ void print_metrics_server(const char *addr_cl, uint16_t snd_port, uint16_t rcv_p
 
 }
 
-void set_socket_options(int socket, uint8_t ip_ttl) {
+void set_socket_options(int socket, uint8_t ip_ttl, uint8_t timeout_secs) {
     /* Set socket options : timeout, IPTTL, IP_RECVTTL, IP_RECVTOS */
     uint8_t One = 1;
     int result;
 
     /* Set Timeout */
-    struct timeval timeout = {LOSTTIME, 0};   //set timeout for 2 seconds
+    struct timeval timeout = {timeout_secs, 0};   //set timeout for 2 seconds
 
     /* Set receive UDP message timeout value */
 #ifdef SO_RCVTIMEO
-/*    result = setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO,
+    result = setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO,
                         (char *) &timeout, sizeof(struct timeval));
     if (result != 0) {
         fprintf(stderr,
                 "[PROBLEM] Cannot set the timeout value for reception.\n");
-    }*/
+    }
 #else
     fprintf(stderr,
             "No way to set the timeout value for incoming packets on that platform.\n");

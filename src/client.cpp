@@ -19,22 +19,24 @@ uint8_t snd_tos = 0;
 uint8_t dscp_snd = 0;
 uint32_t delay_millis = 1000;
 uint32_t num_packets = 10;
+uint8_t timeout = 10;
 void show_help(char* progname){
     std::cout << "\nTwamp-Light implementation written by Vladimir Monakhov. \n" << std::endl;
     std::cout << "Usage: " << progname << " <remote address> [--local_address] [--local_port] [--help]"<< std::endl;
-    std::cout << "-a    --local_address           The address to set up the local socket on.          (Optional, not needed in most cases)" << std::endl;
-    std::cout << "-P    --local_port              The port to set up the local socket on.             (Default: " << local_port << ")" << std::endl;
-    std::cout << "-p    --port                    The port that the remote server is listening on.    (Default: " << remote_port << ")" << std::endl;
-    std::cout << "-l    --payload_len             The payload length. Must be in range (40, 1473).    (Default: " << payload_len << ")" << std::endl;
-    std::cout << "-d    --delay                   The delay given in milliseconds.                    (Default: " << delay_millis << ")" << std::endl;
-    std::cout << "-n    --num_packets             The number of packets to send.                      (Default: " << num_packets << ")" << std::endl;
+    std::cout << "-a    --local_address           The address to set up the local socket on.                            (Optional, not needed in most cases)" << std::endl;
+    std::cout << "-P    --local_port              The port to set up the local socket on.                               (Default: " << local_port << ")" << std::endl;
+    std::cout << "-p    --port                    The port that the remote server is listening on.                      (Default: " << remote_port << ")" << std::endl;
+    std::cout << "-l    --payload_len             The payload length. Must be in range (40, 1473).                      (Default: " << payload_len << ")" << std::endl;
+    std::cout << "-d    --delay                   The delay given in milliseconds.                                      (Default: " << delay_millis << ")" << std::endl;
+    std::cout << "-n    --num_packets             The number of packets to send.                                        (Default: " << num_packets << ")" << std::endl;
+    std::cout << "-t    --timeout                 How long to keep the socket open, when no response is received.       (Default: " << timeout << ")" << std::endl;
     std::cout << "-f    --file                    Save the output as a .csv formatted file. Disables terminal output." <<std::endl;
-    std::cout << "-t    --snd_tos                 The TOS value for Test packets (<256).              (Default: " << unsigned(snd_tos) << ")" << std::endl;
-    std::cout << "-D    --snd_tos                 The DSCP value for Test packets (<64).              (Default: " << unsigned(snd_tos) << ")" << std::endl;
+    std::cout << "-T    --snd_tos                 The TOS value for Test packets (<256).                                (Default: " << unsigned(snd_tos) << ")" << std::endl;
+    std::cout << "-D    --snd_tos                 The DSCP value for Test packets (<64).                                (Default: " << unsigned(snd_tos) << ")" << std::endl;
     std::cout << "-h    --help                    Show this message." << std::endl;
 }
 void parse_args(int argc, char **argv){
-    const char *shortopts = "a:P:p:l:d:n:f:t:D:h";
+    const char *shortopts = "a:P:p:l:d:n:t:f:t:D:h";
     const struct option longopts[] = {
             {"local_address", required_argument, 0, 'a'},
             {"local_port", required_argument, 0, 'P'},
@@ -42,8 +44,9 @@ void parse_args(int argc, char **argv){
             {"payload_len", required_argument, 0, 'l'},
             {"delay", required_argument, 0, 'd'},
             {"num_packets", required_argument, 0, 'n'},
+            {"timeout", required_argument, 0, 't'},
             {"file", required_argument, 0, 'f'},
-            {"snd_tos", required_argument, 0, 't'},
+            {"snd_tos", required_argument, 0, 'T'},
             {"snd_tos", required_argument, 0, 'D'},
             {"help", no_argument, 0, 'h'},
             {0, 0, 0, 0},
@@ -75,10 +78,13 @@ void parse_args(int argc, char **argv){
             case 'n':
                 num_packets = std::stoi(optarg);
                 break;
+            case 't':
+                timeout = std::stoi(optarg);
+                break;
             case 'f':
                 filename = optarg;
                 break;
-            case 't':
+            case 'T':
                 snd_tos = std::stol(optarg);
                 /* The TOS value must be a valid one (no congestion on ECN */
                 snd_tos = snd_tos - (((snd_tos & 0x2) >> 1) & (snd_tos & 0x1));
@@ -166,7 +172,12 @@ void await_response(int fd, std::ofstream& filestream) {
 
     ssize_t count=recvmsg(fd, &incoming_msg, 0);
     if (count==-1) {
-        printf("%s",strerror(errno));
+        if(errno == 11){
+            std::cerr << "Socket timed out." << std::endl;
+            std::exit(EXIT_FAILURE);
+        } else {
+            printf("%s", strerror(errno));
+        }
         throw;
     } else if (incoming_msg.msg_flags & MSG_TRUNC) {
         std::cout << "Datagram too large for buffer: truncated" << std::endl;
@@ -206,7 +217,7 @@ int main(int argc, char **argv) {
         throw;
     }
     // Setup the socket options, to be able to receive TTL and TOS
-    set_socket_options(fd, HDR_TTL);
+    set_socket_options(fd, HDR_TTL, timeout);
     set_socket_tos(fd, snd_tos);
     // Bind the socket to a local port
     if (bind(fd, local_address_info->ai_addr, local_address_info->ai_addrlen) == -1) {
