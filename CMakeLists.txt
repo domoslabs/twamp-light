@@ -21,10 +21,4 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_executable(${CLIENT_TARGET} src/client.cpp ${SOURCES})
 add_executable(${SERVER_TARGET} src/server.cpp ${SOURCES})
 
-# Disable building tests and examples in libfort project
-set(FORT_ENABLE_TESTING OFF CACHE INTERNAL "")
-add_subdirectory(third-party/libfort EXCLUDE_FROM_ALL)
-target_link_libraries(${CLIENT_TARGET} PRIVATE fort)
-target_link_libraries(${SERVER_TARGET} PRIVATE fort)
-
 install(TARGETS twamp-light-client twamp-light-server)

@@ -46,7 +46,6 @@ typedef struct reflector_unauth_packet {
     uint8_t padding[TST_PKT_SIZE - 42];
 } ReflectorPacket;
 
-
 void timeval_to_timestamp(const struct timeval *tv, TWAMPTimestamp * ts);
 
 void timestamp_to_timeval(const TWAMPTimestamp * ts, struct timeval *tv);
@@ -60,11 +59,11 @@ IPHeader get_ip_header(msghdr message);
 uint64_t
 print_metrics(const char *server, uint16_t snd_port, uint16_t rcv_port, uint8_t snd_tos, uint8_t sw_ttl, uint8_t sw_tos,
               TWAMPTimestamp *recv_resp_time, const ReflectorPacket *pack, uint16_t plen, char *device_mac,
-              char *radio_interface, std::ofstream& filestream, const char *filename);
+              char *radio_interface);
 
 void print_metrics_server(const char *addr_cl, uint16_t snd_port, uint16_t rcv_port,
                           uint8_t snd_tos, uint8_t fw_tos,
-                          const ReflectorPacket * pack, std::ofstream &filestream, const char *filename);
+                          const ReflectorPacket * pack);
 void set_socket_options(int socket, uint8_t ip_ttl, uint8_t timeout_secs);
 void set_socket_tos(int socket, uint8_t ip_tos);
 

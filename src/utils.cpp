@@ -1,4 +1,6 @@
 /*
+ * Modified by Domos, original:
+ *
  * Name: Emma Mirică
  * Project: TWAMP Protocol
  * Class: OSS
@@ -12,15 +14,12 @@
  */
 
 #include "twamp_light.h"
-#include "fort.hpp"
-#include <inttypes.h>
+#include <cinttypes>
 #include <sys/time.h>
-#include <stdlib.h>
 #include <arpa/inet.h>
-#include <stdio.h>
-#include <string.h>
+#include <cstdio>
+#include <cstring>
 #include <iostream>
-#include "fstream"
 
 void timeval_to_timestamp(const struct timeval *tv, TWAMPTimestamp *ts) {
     if (!tv || !ts)
@@ -70,11 +69,11 @@ void print_chanims_stats(char *interface) {
     char command[128];
     sprintf(command, "/usr/sbin/wlctl -i %s chanim_stats", interface);
     fp = popen(command, "r");
-    if (fp == NULL) {
+    if (fp == nullptr) {
         printf("Failed to run wlctl chanim_stats\n");
     } else {
         int line = 0;
-        while (fgets(path, sizeof(path) - 1, fp) != NULL) {
+        while (fgets(path, sizeof(path) - 1, fp) != nullptr) {
             if (line == 2) {
                 for (int i = 0; i < 1035; i++) {
                     if (path[i] == '\t') {
@@ -99,7 +98,7 @@ void print_sta_info(char *interface, char *mac) {
     char command[128];
     sprintf(command, "/usr/sbin/wlctl -i %s sta_info %s", interface, mac);
     fp = popen(command, "r");
-    if (fp == NULL) {
+    if (fp == nullptr) {
         printf("Failed to run %s\n", command);
     } else {
         int line = 0;
@@ -109,7 +108,7 @@ void print_sta_info(char *interface, char *mac) {
             if (line >= 37) break;
 
             char *point = strchr(path, ':');
-            if (point == NULL) {
+            if (point == nullptr) {
                 continue;
             }
             point += 2;
@@ -184,11 +183,11 @@ IPHeader get_ip_header(msghdr hdr) {
     };
     return ipHeader;
 }
-
+bool header_printed = false;
 uint64_t
 print_metrics(const char *server, uint16_t snd_port, uint16_t rcv_port, uint8_t snd_tos, uint8_t sw_ttl, uint8_t sw_tos,
               TWAMPTimestamp *recv_resp_time, const ReflectorPacket *pack, uint16_t plen, char *device_mac,
-              char *radio_interface, std::ofstream &filestream, const char *filename) {
+              char *radio_interface) {
     /* Compute timestamps in usec */
     uint64_t t_sender_usec = get_usec(&pack->sender_time);
     uint64_t t_receive_usec = get_usec(&pack->receive_time);
@@ -209,39 +208,22 @@ print_metrics(const char *server, uint16_t snd_port, uint16_t rcv_port, uint8_t 
     uint32_t rcv_sn = ntohl(pack->seq_number);
     uint32_t snd_sn = ntohl(pack->sender_seq_number);
 
-    if (device_mac != NULL && radio_interface != NULL) {
+    if (device_mac != nullptr && radio_interface != nullptr) {
         print_chanims_stats(radio_interface);
         print_sta_info(radio_interface, device_mac);
         fprintf(stdout, "%s,%s,", device_mac, radio_interface);
     }
-    if(filename == nullptr){
-        fort::char_table table;
-        table.set_border_style(FT_EMPTY_STYLE);
-        table << fort::header
-              << "Time"<< "IP"<< "Snd#"<< "Rcv#"<< "SndPort"<< "RscPort"<< "Sync"<< "FW_TTL"
-              << "SW_TTL"<< "SndTOS"<< "FW_TOS"<< "SW_TOS"<< "RTT [ms]"<< "IntD [ms]"
-              << "FWD [ms]"<< "SWD [ms]"<< "PLEN"
-              << fort::endr;
-        table << fort::header
-              << std::fixed << (double) t_sender_usec * 1e-3<< server<< snd_sn<< rcv_sn<< snd_port
-              << rcv_port<< sync<< unsigned(pack->sender_ttl)<< unsigned(sw_ttl)
-              << unsigned(snd_tos)<< '-'<< unsigned(sw_tos)<<(double) rtt * 1e-3
-              <<(double) intd* 1e-3<< (double) fwd * 1e-3<< (double) swd * 1e-3<< plen
-              << fort::endr;
-        std::cout << table.to_string() << std::flush;
-    } else {
-        if(!filestream.is_open()){
-            filestream.open(filename);
-            filestream << "Time,"<< "IP,"<< "Snd#,"<< "Rcv#,"<< "SndPort,"<< "RscPort,"<< "Sync,"<< "FW_TTL,"
-                       << "SW_TTL,"<< "SndTOS,"<< "FW_TOS,"<< "SW_TOS,"<< "RTT,"<< "IntD,"
-                       << "FWD,"<< "SWD,"<< "PLEN" << "\n";
 
-        }
-        filestream << std::fixed << (double) t_sender_usec * 1e-3 << "," << server<< ","<< snd_sn<< ","<< rcv_sn<< ","<< snd_port<< ","
-                   << rcv_port<< ","<< sync<< ","<< unsigned(pack->sender_ttl)<< ","<< unsigned(sw_ttl)<< ","
-                   << unsigned(snd_tos)<< ","<< '-'<< ","<< unsigned(sw_tos)<< ","<<(double) rtt * 1e-3<< ","
-                   <<(double) intd* 1e-3<< ","<< (double) fwd * 1e-3<< ","<< (double) swd * 1e-3<< ","<< plen << "\n";
+    if(!header_printed){
+        std::cout << "Time,"<< "IP,"<< "Snd#,"<< "Rcv#,"<< "SndPort,"<< "RscPort,"<< "Sync,"<< "FW_TTL,"
+                   << "SW_TTL,"<< "SndTOS,"<< "FW_TOS,"<< "SW_TOS,"<< "RTT,"<< "IntD,"
+                   << "FWD,"<< "SWD,"<< "PLEN" << "\n";
+        header_printed = true;
     }
+    std::cout << std::fixed << (double) t_sender_usec * 1e-3 << "," << server<< ","<< snd_sn<< ","<< rcv_sn<< ","<< snd_port<< ","
+               << rcv_port<< ","<< sync<< ","<< unsigned(pack->sender_ttl)<< ","<< unsigned(sw_ttl)<< ","
+               << unsigned(snd_tos)<< ","<< '-'<< ","<< unsigned(sw_tos)<< ","<<(double) rtt * 1e-3<< ","
+               <<(double) intd* 1e-3<< ","<< (double) fwd * 1e-3<< ","<< (double) swd * 1e-3<< ","<< plen << "\n";
 
     return t_recvresp_usec - t_sender_usec;
 
@@ -250,7 +232,7 @@ print_metrics(const char *server, uint16_t snd_port, uint16_t rcv_port, uint8_t 
 
 void print_metrics_server(const char *addr_cl, uint16_t snd_port, uint16_t rcv_port,
                           uint8_t snd_tos, uint8_t fw_tos,
-                          const ReflectorPacket *pack, std::ofstream &filestream, const char *filename) {
+                          const ReflectorPacket *pack) {
 
     /* Compute timestamps in usec */
     uint64_t t_sender_usec1 = get_usec(&pack->sender_time);
@@ -271,30 +253,15 @@ void print_metrics_server(const char *addr_cl, uint16_t snd_port, uint16_t rcv_p
     /* Sender TOS with ECN from FW TOS */
     snd_tos =
             snd_tos + (fw_tos & 0x3) - (((fw_tos & 0x2) >> 1) & (fw_tos & 0x1));
-    if(filename == nullptr){
-        fort::char_table table;
-        table.set_border_style(FT_EMPTY_STYLE);
-        table << fort::header
-              << "Time" << "IP"<< "Snd#"<< "Rcv#"<< "SndPort"<< "RscPort"<< "Sync"<< "FW_TTL"
-              << "SndTOS"<< "FW_TOS"<< "IntD [ms]"<< "FWD [ms]"
-              << fort::endr;
-        table << fort::header
-              << std::fixed << (double) t_sender_usec1 << addr_cl  << snd_nb
-              <<rcv_nb << snd_port << rcv_port << sync1 << unsigned(pack->sender_ttl)<< unsigned(snd_tos)
-              <<unsigned(fw_tos) << (double) intd1 * 1e-3 << (double) fwd1 * 1e-3
-              << fort::endr;
-        std::cout << table.to_string() << std::flush;
-    } else {
-        if(!filestream.is_open()){
-            filestream.open(filename);
-            filestream << "Time," << "IP,"<< "Snd#,"<< "Rcv#,"<< "SndPort,"<< "RscPort,"<< "Sync,"<< "FW_TTL,"
-                       << "SndTOS,"<< "FW_TOS,"<< "IntD,"<< "FWD," << "\n";
-        }
-        filestream << std::fixed << (double) t_sender_usec1 << "," << addr_cl << ","  << snd_nb << ","
-                   <<rcv_nb << "," << snd_port << "," << rcv_port << "," << sync1 << "," << unsigned(pack->sender_ttl) << ","<< unsigned(snd_tos) << ","
-                   <<unsigned(fw_tos) << "," << (double) intd1 * 1e-3  << ","<< (double) fwd1 * 1e-3 << "\n";
-    }
+    if(!header_printed){
 
+        std::cout << "Time," << "IP,"<< "Snd#,"<< "Rcv#,"<< "SndPort,"<< "RscPort,"<< "Sync,"<< "FW_TTL,"
+                   << "SndTOS,"<< "FW_TOS,"<< "IntD,"<< "FWD" << "\n";
+        header_printed = true;
+    }
+    std::cout << std::fixed << (double) t_sender_usec1 << "," << addr_cl << ","  << snd_nb << ","
+               <<rcv_nb << "," << snd_port << "," << rcv_port << "," << sync1 << "," << unsigned(pack->sender_ttl) << ","<< unsigned(snd_tos) << ","
+               <<unsigned(fw_tos) << "," << (double) intd1 * 1e-3  << ","<< (double) fwd1 * 1e-3 << "\n";
 
 }
 

@@ -13,7 +13,6 @@ const char* remote_host = "";
 const char* remote_port = "443";
 const char* local_host = nullptr;
 const char* local_port = "445";
-const char* filename = nullptr;
 uint16_t payload_len = 140;
 uint8_t snd_tos = 0;
 uint8_t dscp_snd = 0;
@@ -30,13 +29,12 @@ void show_help(char* progname){
     std::cout << "-d    --delay                   The delay given in milliseconds.                                      (Default: " << delay_millis << ")" << std::endl;
     std::cout << "-n    --num_packets             The number of packets to send.                                        (Default: " << num_packets << ")" << std::endl;
     std::cout << "-t    --timeout                 How long to keep the socket open, when no response is received.       (Default: " << timeout << ")" << std::endl;
-    std::cout << "-f    --file                    Save the output as a .csv formatted file. Disables terminal output." <<std::endl;
     std::cout << "-T    --snd_tos                 The TOS value for Test packets (<256).                                (Default: " << unsigned(snd_tos) << ")" << std::endl;
     std::cout << "-D    --snd_tos                 The DSCP value for Test packets (<64).                                (Default: " << unsigned(snd_tos) << ")" << std::endl;
     std::cout << "-h    --help                    Show this message." << std::endl;
 }
 void parse_args(int argc, char **argv){
-    const char *shortopts = "a:P:p:l:d:n:t:f:t:D:h";
+    const char *shortopts = "a:P:p:l:d:n:t:t:D:h";
     const struct option longopts[] = {
             {"local_address", required_argument, 0, 'a'},
             {"local_port", required_argument, 0, 'P'},
@@ -45,7 +43,6 @@ void parse_args(int argc, char **argv){
             {"delay", required_argument, 0, 'd'},
             {"num_packets", required_argument, 0, 'n'},
             {"timeout", required_argument, 0, 't'},
-            {"file", required_argument, 0, 'f'},
             {"snd_tos", required_argument, 0, 'T'},
             {"snd_tos", required_argument, 0, 'D'},
             {"help", no_argument, 0, 'h'},
@@ -80,9 +77,6 @@ void parse_args(int argc, char **argv){
                 break;
             case 't':
                 timeout = std::stoi(optarg);
-                break;
-            case 'f':
-                filename = optarg;
                 break;
             case 'T':
                 snd_tos = std::stol(optarg);
@@ -124,7 +118,7 @@ SenderPacket craft_sender_packet(int idx){
     return packet;
 }
 uint16_t num_lost = 0;
-void handle_reflector_packet(ReflectorPacket *reflectorPacket, msghdr msghdr, int fd, std::ofstream& filestream) {
+void handle_reflector_packet(ReflectorPacket *reflectorPacket, msghdr msghdr, int fd) {
     IPHeader ipHeader = get_ip_header(msghdr);
     TWAMPTimestamp ts = get_timestamp();
     if(reflectorPacket->sender_seq_number != reflectorPacket->seq_number){
@@ -132,7 +126,7 @@ void handle_reflector_packet(ReflectorPacket *reflectorPacket, msghdr msghdr, in
     }
     print_metrics(remote_host, std::stoi(local_port), std::stoi(remote_port), reflectorPacket->sender_tos, ipHeader.ttl,
                   ipHeader.tos, &ts,
-                  reflectorPacket, payload_len, nullptr, nullptr, filestream, filename);
+                  reflectorPacket, payload_len, nullptr, nullptr);
 }
 void send_packet(addrinfo* remote_address_info, int idx, int fd){
     // Send the UDP packet
@@ -153,7 +147,7 @@ void send_packet(addrinfo* remote_address_info, int idx, int fd){
         throw std::runtime_error(std::string("Sending UDP message failed with error."));
     }
 }
-void await_response(int fd, std::ofstream& filestream) {
+void await_response(int fd) {
     // Read incoming datagram
     char buffer[sizeof(ReflectorPacket)]; //We should only be receiving ReflectorPackets
     struct sockaddr *src_addr;
@@ -183,12 +177,11 @@ void await_response(int fd, std::ofstream& filestream) {
         std::cout << "Datagram too large for buffer: truncated" << std::endl;
     } else {
         auto *rec = (ReflectorPacket *)buffer;
-        handle_reflector_packet(rec, incoming_msg, fd, filestream);
+        handle_reflector_packet(rec, incoming_msg, fd);
     }
 
 }
 int main(int argc, char **argv) {
-    auto filestream = std::ofstream();
     parse_args(argc, argv);
 
     // Construct remote socket address
@@ -226,10 +219,9 @@ int main(int argc, char **argv) {
     }
     for(int i = 0; i < num_packets; i++){
         send_packet(remote_address_info, i, fd);
-        await_response(fd, filestream);
+        await_response(fd);
         usleep(delay_millis*1000);
     }
-    filestream.close();
 }
 
 

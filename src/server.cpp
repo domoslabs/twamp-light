@@ -11,7 +11,6 @@
 #include "twamp_light.h"
 const char* local_host = nullptr; // Does not matter, use wildcard
 const char* local_port = "443";
-const char* filename = nullptr;
 uint8_t timeout = 10;
 uint32_t num_packets = 10;
 void show_help(char* progname){
@@ -21,17 +20,15 @@ void show_help(char* progname){
     std::cout << "-P    --local_port              The port to set up the local socket on.                               (Default: " << local_port << ")" << std::endl;
     std::cout << "-n    --num_packets             The number of packets to receive.                                     (Default: " << num_packets << ")" << std::endl;
     std::cout << "-t    --timeout                 How long to keep the socket open, when no response is received.       (Default: " << timeout << ")" << std::endl;
-    std::cout << "-f    --file                    Save the output as a .csv formatted file. Disables terminal output." <<std::endl;
     std::cout << "-h    --help                    Show this message." << std::endl;
 }
 void parse_args(int argc, char **argv){
-    const char *shortopts = "a:P:n:t:f:h";
+    const char *shortopts = "a:P:n:t:h";
     const struct option longopts[] = {
             {"local_address", required_argument, 0, 'a'},
             {"local_port", required_argument, 0, 'P'},
             {"num_packets", required_argument, 0, 'n'},
             {"timeout", required_argument, 0, 't'},
-            {"file", required_argument, 0, 'f'},
             {"help", no_argument, 0, 'h'},
             {0, 0, 0, 0},
     };
@@ -54,9 +51,6 @@ void parse_args(int argc, char **argv){
             case 't':
                 timeout = std::stoi(optarg);
                 break;
-            case 'f':
-                filename = optarg;
-                break;
             default:
                 std::cerr << "Invalid argument: " << c << ". See --help." << std::endl;
                 std::exit(EXIT_FAILURE);
@@ -77,12 +71,12 @@ ReflectorPacket craft_reflector_packet(SenderPacket *sender_packet, msghdr sende
     packet.time = get_timestamp();
     return packet;
 }
-void handle_test_packet(SenderPacket *packet, msghdr sender_msg, int fd, std::ofstream& filestream){
+void handle_test_packet(SenderPacket *packet, msghdr sender_msg, int fd){
     ReflectorPacket reflector_packet = craft_reflector_packet(packet, sender_msg);
     // Overwrite and reuse the sender message with our own data and send it back, instead of creating a new one.
     auto *hdr = (sockaddr_in *)sender_msg.msg_name;
     char *ip = inet_ntoa(hdr->sin_addr);
-    print_metrics_server(ip, htons(hdr->sin_port), std::stoi(local_port), reflector_packet.sender_tos, 0, &reflector_packet, filestream, filename);
+    print_metrics_server(ip, htons(hdr->sin_port), std::stoi(local_port), reflector_packet.sender_tos, 0, &reflector_packet);
     msghdr message = sender_msg;
     struct iovec iov[1];
     iov[0].iov_base=&reflector_packet;
@@ -97,7 +91,6 @@ void handle_test_packet(SenderPacket *packet, msghdr sender_msg, int fd, std::of
 }
 int main(int argc, char **argv) {
     parse_args(argc, argv);
-    auto filestream = std::ofstream();
     // Construct socket address
     struct addrinfo hints = {};
     memset(&hints,0,sizeof(hints));
@@ -160,8 +153,7 @@ int main(int argc, char **argv) {
             std::cout << "Datagram too large for buffer: truncated" << std::endl;
         } else {
             auto *rec = (SenderPacket *) buffer;
-            handle_test_packet(rec, message, fd, filestream);
+            handle_test_packet(rec, message, fd);
         }
     }
-    filestream.close();
 }
