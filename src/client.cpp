@@ -6,110 +6,56 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/uio.h>
-#include <getopt.h>
-#include "twamp_light.h"
-#include <fstream>
-const char* remote_host = "";
-const char* remote_port = "443";
-const char* local_host = nullptr;
-const char* local_port = "445";
-uint16_t payload_len = 140;
-uint8_t snd_tos = 0;
-uint8_t dscp_snd = 0;
-uint32_t delay_millis = 1000;
-uint32_t num_packets = 10;
-uint8_t timeout = 10;
-void show_help(char* progname){
-    std::cout << "\nTwamp-Light implementation written by Vladimir Monakhov. \n" << std::endl;
-    std::cout << "Usage: " << progname << " <remote address> [--local_address] [--local_port] [--help]"<< std::endl;
-    std::cout << "-a    --local_address           The address to set up the local socket on.                            (Optional, not needed in most cases)" << std::endl;
-    std::cout << "-P    --local_port              The port to set up the local socket on.                               (Default: " << local_port << ")" << std::endl;
-    std::cout << "-p    --port                    The port that the remote server is listening on.                      (Default: " << remote_port << ")" << std::endl;
-    std::cout << "-l    --payload_len             The payload length. Must be in range (40, 1473).                      (Default: " << payload_len << ")" << std::endl;
-    std::cout << "-d    --delay                   The delay given in milliseconds.                                      (Default: " << delay_millis << ")" << std::endl;
-    std::cout << "-n    --num_packets             The number of packets to send.                                        (Default: " << num_packets << ")" << std::endl;
-    std::cout << "-t    --timeout                 How long to keep the socket open, when no response is received.       (Default: " << timeout << ")" << std::endl;
-    std::cout << "-T    --snd_tos                 The TOS value for Test packets (<256).                                (Default: " << unsigned(snd_tos) << ")" << std::endl;
-    std::cout << "-D    --snd_tos                 The DSCP value for Test packets (<64).                                (Default: " << unsigned(snd_tos) << ")" << std::endl;
-    std::cout << "-h    --help                    Show this message." << std::endl;
+#include "twamp_light.hpp"
+#include <CLI11.hpp>
+struct Args {
+    std::string remote_host;
+    std::string remote_port = "443";
+    std::string local_host;
+    std::string local_port = "445";
+    std::vector<uint16_t> payload_len = std::vector<uint16_t>();
+    uint8_t snd_tos = 0;
+    uint8_t dscp_snd = 0;
+    uint32_t delay_millis = 1000;
+    uint32_t num_samples = 10;
+    uint8_t timeout = 10;
+    uint32_t seed = 0;
+};
+Args parse_args(int argc, char **argv){
+    Args args;
+    args.payload_len.push_back(40);
+    args.payload_len.push_back(80);
+    args.payload_len.push_back(120);
+    uint8_t dscp = 0, tos = 0;
+    CLI::App app{"Twamp-Light implementation written by Domos."};
+    app.add_option("address", args.remote_host, "The address of the remote TWAMP Server.");
+    app.add_option("-a, --local_address", args.local_host, "The address to set up the local socket on. Auto-selects by default.");
+    app.add_option("-P, --local_port", args.local_port, "The port to set up the local socket on.");
+    app.add_option("-p, --port", args.remote_port, "The port that the remote server is listening on.");
+    app.add_option<std::vector<uint16_t>>("-l, --payload_len", args.payload_len, "The payload length. Must be in range (40, 1473). Can be multiple values, in which case it is selected randomly.")->default_str(vectorToString(args.payload_len, " "));
+    app.add_option("-n, --num_samples", args.num_samples, "Number of samples to expect.");
+    app.add_option("-t, --timeout", args.timeout, "How long (in seconds) to keep the socket open, when no packets are incoming.");
+    app.add_option("-d, --delay", args.delay_millis, "How long (in millis) to wait between sending each packet.");
+    app.add_option("-s, --seed", args.seed, "Seed for the RNG. 0 means random.");
+    auto opt_tos = app.add_option("-T, --tos", tos, "The TOS value (<256).");
+    auto opt_dscp = app.add_option("-D, --dscp", dscp, "The DSCP value (<64).");
+    opt_tos->excludes(opt_dscp);
+    opt_dscp->excludes(opt_tos);
+    if(*opt_tos){
+        args.snd_tos = tos - (((tos & 0x2) >> 1) & (tos & 0x1));
+    }
+    if(*opt_dscp){
+        args.snd_tos = dscp << 2;
+    }
+    try{
+        app.parse(argc, argv);
+    }catch(const CLI::ParseError &e) {
+        std::exit((app).exit(e));
+    }
+
+    return args;
 }
-void parse_args(int argc, char **argv){
-    const char *shortopts = "a:P:p:l:d:n:t:t:D:h";
-    const struct option longopts[] = {
-            {"local_address", required_argument, 0, 'a'},
-            {"local_port", required_argument, 0, 'P'},
-            {"port", required_argument, 0, 'p'},
-            {"payload_len", required_argument, 0, 'l'},
-            {"delay", required_argument, 0, 'd'},
-            {"num_packets", required_argument, 0, 'n'},
-            {"timeout", required_argument, 0, 't'},
-            {"snd_tos", required_argument, 0, 'T'},
-            {"snd_tos", required_argument, 0, 'D'},
-            {"help", no_argument, 0, 'h'},
-            {0, 0, 0, 0},
-    };
-    int c, option_index;
-    while ((c = getopt_long(argc, argv, shortopts, longopts, &option_index)) != -1){
-        switch (c)
-        {
-            case 'a':
-                local_host = optarg;
-                break;
-            case 'h':
-                show_help(argv[0]);
-                std::exit(EXIT_SUCCESS);
-            case 'p':
-                remote_port = optarg;
-                break;
-            case 'l':
-                payload_len = std::stol(optarg);
-                /* The length value must be a valid one */
-                if (payload_len < 41 || payload_len > TST_PKT_SIZE){
-                    std::cerr << "The payload length must be in range (40, 1473). See --help." << std::endl;
-                    std::exit(EXIT_FAILURE);
-                }
-                break;
-            case 'd':
-                delay_millis = std::stoi(optarg);
-                break;
-            case 'n':
-                num_packets = std::stoi(optarg);
-                break;
-            case 't':
-                timeout = std::stoi(optarg);
-                break;
-            case 'T':
-                snd_tos = std::stol(optarg);
-                /* The TOS value must be a valid one (no congestion on ECN */
-                snd_tos = snd_tos - (((snd_tos & 0x2) >> 1) & (snd_tos & 0x1));
-                break;
-            case 'D':
-                dscp_snd = std::stol(optarg);
-                /* The DSCP value must be a valid one */
-                if (dscp_snd > 63) {
-                    std::cerr << "The DSCP value must be  <64. See --help." << std::endl;
-                    std::exit(EXIT_FAILURE);
-                }
-                snd_tos = dscp_snd << 2;
-                break;
-            case 'P':
-                local_port = optarg;
-                break;
-            default:
-                std::cerr << "Invalid argument: " << c << ". See --help." << std::endl;
-                std::exit(EXIT_FAILURE);
-        }
-    }
-    if (optind == argc) {
-        std::cerr << "Remote host address is required. See --help" << std::endl;
-        std::exit(EXIT_FAILURE);
-    }
-    if (optind + 1 < argc) {
-        std::cerr << "Exactly one remote host is required. See --help" << std::endl;
-        std::exit(EXIT_FAILURE);
-    }
-    remote_host = argv[optind];
-}
+
 SenderPacket craft_sender_packet(int idx){
     SenderPacket packet = {};
     packet.seq_number = htonl(idx); //TODO Use an index value or something here
@@ -118,17 +64,17 @@ SenderPacket craft_sender_packet(int idx){
     return packet;
 }
 uint16_t num_lost = 0;
-void handle_reflector_packet(ReflectorPacket *reflectorPacket, msghdr msghdr, int fd) {
+void handle_reflector_packet(ReflectorPacket *reflectorPacket, msghdr msghdr, int fd, size_t payload_len, const Args& args) {
     IPHeader ipHeader = get_ip_header(msghdr);
     TWAMPTimestamp ts = get_timestamp();
     if(reflectorPacket->sender_seq_number != reflectorPacket->seq_number){
         num_lost++;
     }
-    print_metrics(remote_host, std::stoi(local_port), std::stoi(remote_port), reflectorPacket->sender_tos, ipHeader.ttl,
+    print_metrics(args.remote_host.c_str(), std::stoi(args.local_port), std::stoi(args.remote_port), reflectorPacket->sender_tos, ipHeader.ttl,
                   ipHeader.tos, &ts,
                   reflectorPacket, payload_len, nullptr, nullptr);
 }
-void send_packet(addrinfo* remote_address_info, int idx, int fd){
+void send_packet(addrinfo* remote_address_info, int idx, int fd, size_t payload_len){
     // Send the UDP packet
     SenderPacket senderPacket = craft_sender_packet(idx);
     struct iovec iov[1];
@@ -147,7 +93,7 @@ void send_packet(addrinfo* remote_address_info, int idx, int fd){
         throw std::runtime_error(std::string("Sending UDP message failed with error."));
     }
 }
-void await_response(int fd) {
+void await_response(int fd, size_t payload_len, const Args& args) {
     // Read incoming datagram
     char buffer[sizeof(ReflectorPacket)]; //We should only be receiving ReflectorPackets
     struct sockaddr *src_addr;
@@ -177,12 +123,12 @@ void await_response(int fd) {
         std::cout << "Datagram too large for buffer: truncated" << std::endl;
     } else {
         auto *rec = (ReflectorPacket *)buffer;
-        handle_reflector_packet(rec, incoming_msg, fd);
+        handle_reflector_packet(rec, incoming_msg, fd, payload_len, args);
     }
 
 }
 int main(int argc, char **argv) {
-    parse_args(argc, argv);
+    Args args = parse_args(argc, argv);
 
     // Construct remote socket address
     struct addrinfo hints{};
@@ -193,8 +139,8 @@ int main(int argc, char **argv) {
     hints.ai_flags=AI_PASSIVE|AI_ADDRCONFIG;
     struct addrinfo* remote_address_info=nullptr;
     struct addrinfo* local_address_info=nullptr;
-    int err=getaddrinfo(remote_host,remote_port,&hints,&remote_address_info);
-    int err2=getaddrinfo(local_host,local_port,&hints,&local_address_info);
+    int err=getaddrinfo(args.remote_host.c_str(),args.remote_port.c_str(),&hints,&remote_address_info);
+    int err2=getaddrinfo(args.local_host.empty()? nullptr : args.local_host.c_str(),args.local_port.c_str(),&hints,&local_address_info);
     if (err!=0) {
         std::cerr << "failed to resolve remote socket address: " << err;
         return 0;
@@ -210,17 +156,18 @@ int main(int argc, char **argv) {
         throw;
     }
     // Setup the socket options, to be able to receive TTL and TOS
-    set_socket_options(fd, HDR_TTL, timeout);
-    set_socket_tos(fd, snd_tos);
+    set_socket_options(fd, HDR_TTL, args.timeout);
+    set_socket_tos(fd, args.snd_tos);
     // Bind the socket to a local port
     if (bind(fd, local_address_info->ai_addr, local_address_info->ai_addrlen) == -1) {
         std::cerr << strerror(errno) << std::endl;
         throw;
     }
-    for(int i = 0; i < num_packets; i++){
-        send_packet(remote_address_info, i, fd);
-        await_response(fd);
-        usleep(delay_millis*1000);
+    for(int i = 0; i < args.num_samples; i++){
+        size_t payload_len = *select_randomly(args.payload_len.begin(), args.payload_len.end(), args.seed);
+        send_packet(remote_address_info, i, fd, payload_len);
+        await_response(fd, payload_len, args);
+        usleep(args.delay_millis*1000);
     }
 }
 

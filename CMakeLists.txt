@@ -3,7 +3,8 @@ project(domos_twamp_light)
 set(CMAKE_CXX_STANDARD 11)
 set(
         SOURCES
-        include/twamp_light.h
+        include/twamp_light.hpp
+        include/CLI11.hpp
         src/utils.cpp
 )
 set(

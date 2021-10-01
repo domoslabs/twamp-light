@@ -8,53 +8,30 @@
 #include <netinet/in.h>
 #include <getopt.h>
 #include <arpa/inet.h>
-#include "twamp_light.h"
-const char* local_host = nullptr; // Does not matter, use wildcard
-const char* local_port = "443";
-uint8_t timeout = 10;
-uint32_t num_packets = 10;
-void show_help(char* progname){
-    std::cout << "\nTwamp-Light implementation written by Domos. \n" << std::endl;
-    std::cout << "Usage: " << progname << " [--local_address] [--local_port] [--help]"<< std::endl;
-    std::cout << "-a    --local_address           The address to set up the local socket on.                            (Optional, not needed in most cases)" << std::endl;
-    std::cout << "-P    --local_port              The port to set up the local socket on.                               (Default: " << local_port << ")" << std::endl;
-    std::cout << "-n    --num_packets             The number of packets to receive.                                     (Default: " << num_packets << ")" << std::endl;
-    std::cout << "-t    --timeout                 How long to keep the socket open, when no response is received.       (Default: " << timeout << ")" << std::endl;
-    std::cout << "-h    --help                    Show this message." << std::endl;
-}
-void parse_args(int argc, char **argv){
-    const char *shortopts = "a:P:n:t:h";
-    const struct option longopts[] = {
-            {"local_address", required_argument, 0, 'a'},
-            {"local_port", required_argument, 0, 'P'},
-            {"num_packets", required_argument, 0, 'n'},
-            {"timeout", required_argument, 0, 't'},
-            {"help", no_argument, 0, 'h'},
-            {0, 0, 0, 0},
-    };
-    int c, option_index;
-    while ((c = getopt_long(argc, argv, shortopts, longopts, &option_index)) != -1)
-        switch (c)
-        {
-            case 'a':
-                local_host = optarg;
-                break;
-            case 'h':
-                show_help(argv[0]);
-                std::exit(EXIT_SUCCESS);
-            case 'P':
-                local_port = optarg;
-                break;
-            case 'n':
-                num_packets = std::stoi(optarg);
-                break;
-            case 't':
-                timeout = std::stoi(optarg);
-                break;
-            default:
-                std::cerr << "Invalid argument: " << c << ". See --help." << std::endl;
-                std::exit(EXIT_FAILURE);
-        }
+#include <vector>
+#include <CLI11.hpp>
+#include "twamp_light.hpp"
+struct Args{
+    std::string local_host;
+    std::string local_port = "443";
+    uint32_t num_samples = 0;
+    uint8_t timeout = 10;
+};
+Args parse_args(int argc, char **argv){
+    Args args;
+    CLI::App app{"Twamp-Light implementation written by Domos."};
+    app.option_defaults()->always_capture_default(true);
+    app.add_option("-a, --local_address", args.local_host, "The address to set up the local socket on. Auto-selects by default.");
+    app.add_option("-P, --local_port", args.local_port, "The port to set up the local socket on.");
+    app.add_option("-n, --num_samples", args.num_samples, "Number of samples to expect.");
+    app.add_option("-t, --timeout", args.timeout, "How long (in seconds) to keep the socket open, when no packets are incoming.");
+    try{
+        app.parse(argc, argv);
+    }catch(const CLI::ParseError &e) {
+        std::exit((app).exit(e));
+    }
+
+    return args;
 }
 ReflectorPacket craft_reflector_packet(SenderPacket *sender_packet, msghdr sender_msg){
 
@@ -71,12 +48,12 @@ ReflectorPacket craft_reflector_packet(SenderPacket *sender_packet, msghdr sende
     packet.time = get_timestamp();
     return packet;
 }
-void handle_test_packet(SenderPacket *packet, msghdr sender_msg, int fd){
+void handle_test_packet(SenderPacket *packet, msghdr sender_msg, int fd, const Args& args){
     ReflectorPacket reflector_packet = craft_reflector_packet(packet, sender_msg);
     // Overwrite and reuse the sender message with our own data and send it back, instead of creating a new one.
     auto *hdr = (sockaddr_in *)sender_msg.msg_name;
     char *ip = inet_ntoa(hdr->sin_addr);
-    print_metrics_server(ip, htons(hdr->sin_port), std::stoi(local_port), reflector_packet.sender_tos, 0, &reflector_packet);
+    print_metrics_server(ip, htons(hdr->sin_port), std::stoi(args.local_port), reflector_packet.sender_tos, 0, &reflector_packet);
     msghdr message = sender_msg;
     struct iovec iov[1];
     iov[0].iov_base=&reflector_packet;
@@ -90,7 +67,7 @@ void handle_test_packet(SenderPacket *packet, msghdr sender_msg, int fd){
     }
 }
 int main(int argc, char **argv) {
-    parse_args(argc, argv);
+    Args args = parse_args(argc, argv);
     // Construct socket address
     struct addrinfo hints = {};
     memset(&hints,0,sizeof(hints));
@@ -99,7 +76,7 @@ int main(int argc, char **argv) {
     hints.ai_protocol=0;
     hints.ai_flags=AI_PASSIVE|AI_ADDRCONFIG;
     struct addrinfo* res= nullptr;
-    int err=getaddrinfo(local_host,local_port,&hints,&res);
+    int err=getaddrinfo(args.local_host.empty()? nullptr : args.local_host.c_str(),args.local_port.c_str(),&hints,&res);
     if (err!=0) {
         std::cerr << "failed to resolve local socket address: " << err << std::endl;
         return 0;
@@ -112,7 +89,7 @@ int main(int argc, char **argv) {
         return -1;
     }
     // Setup the socket options, to be able to receive TTL and TOS
-    set_socket_options(fd, HDR_TTL, timeout);
+    set_socket_options(fd, HDR_TTL, args.timeout);
     set_socket_tos(fd, 10);
     // Bind the socket
     if (bind(fd,res->ai_addr,res->ai_addrlen)==-1) {
@@ -122,7 +99,15 @@ int main(int argc, char **argv) {
     // Free the socket address info, since it is no longer needed. ??
     freeaddrinfo(res);
     // Read incoming datagrams
-    for(int i = 0; i < num_packets; i++) {
+    bool run = true;
+    int counter = 0;
+    while(run){
+        if(args.num_samples != 0){
+            counter++;
+            if(counter > args.num_samples){
+                run = false;
+            }
+        }
         char buffer[sizeof(SenderPacket)]; //We should only be receiving test_packets
         struct sockaddr *src_addr;
 
@@ -153,7 +138,7 @@ int main(int argc, char **argv) {
             std::cout << "Datagram too large for buffer: truncated" << std::endl;
         } else {
             auto *rec = (SenderPacket *) buffer;
-            handle_test_packet(rec, message, fd);
+            handle_test_packet(rec, message, fd, args);
         }
     }
 }

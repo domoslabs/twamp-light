@@ -13,7 +13,7 @@
  *
  */
 
-#include "twamp_light.h"
+#include "twamp_light.hpp"
 #include <cinttypes>
 #include <sys/time.h>
 #include <arpa/inet.h>
@@ -275,12 +275,15 @@ void set_socket_options(int socket, uint8_t ip_ttl, uint8_t timeout_secs) {
 
     /* Set receive UDP message timeout value */
 #ifdef SO_RCVTIMEO
-    result = setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO,
-                        (char *) &timeout, sizeof(struct timeval));
-    if (result != 0) {
-        fprintf(stderr,
-                "[PROBLEM] Cannot set the timeout value for reception.\n");
+    if(timeout_secs != 0){
+        result = setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO,
+                            (char *) &timeout, sizeof(struct timeval));
+        if (result != 0) {
+            fprintf(stderr,
+                    "[PROBLEM] Cannot set the timeout value for reception.\n");
+        }
     }
+
 #else
     fprintf(stderr,
             "No way to set the timeout value for incoming packets on that platform.\n");
