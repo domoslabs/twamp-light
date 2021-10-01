@@ -67,7 +67,7 @@ print_metrics(const char *server, uint16_t snd_port, uint16_t rcv_port, uint8_t 
               char *radio_interface);
 
 void print_metrics_server(const char *addr_cl, uint16_t snd_port, uint16_t rcv_port,
-                          uint8_t snd_tos, uint8_t fw_tos,
+                          uint8_t snd_tos, uint8_t fw_tos, uint16_t plen,
                           const ReflectorPacket * pack);
 void set_socket_options(int socket, uint8_t ip_ttl, uint8_t timeout_secs);
 void set_socket_tos(int socket, uint8_t ip_tos);

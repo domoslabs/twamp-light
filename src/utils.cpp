@@ -231,7 +231,7 @@ print_metrics(const char *server, uint16_t snd_port, uint16_t rcv_port, uint8_t 
 
 
 void print_metrics_server(const char *addr_cl, uint16_t snd_port, uint16_t rcv_port,
-                          uint8_t snd_tos, uint8_t fw_tos,
+                          uint8_t snd_tos, uint8_t fw_tos, uint16_t plen,
                           const ReflectorPacket *pack) {
 
     /* Compute timestamps in usec */
@@ -256,12 +256,12 @@ void print_metrics_server(const char *addr_cl, uint16_t snd_port, uint16_t rcv_p
     if(!header_printed){
 
         std::cout << "Time," << "IP,"<< "Snd#,"<< "Rcv#,"<< "SndPort,"<< "RscPort,"<< "Sync,"<< "FW_TTL,"
-                   << "SndTOS,"<< "FW_TOS,"<< "IntD,"<< "FWD" << "\n";
+                   << "SndTOS,"<< "FW_TOS,"<< "IntD,"<< "FWD," << "PLEN" << "\n";
         header_printed = true;
     }
     std::cout << std::fixed << (double) t_sender_usec1 << "," << addr_cl << ","  << snd_nb << ","
                <<rcv_nb << "," << snd_port << "," << rcv_port << "," << sync1 << "," << unsigned(pack->sender_ttl) << ","<< unsigned(snd_tos) << ","
-               <<unsigned(fw_tos) << "," << (double) intd1 * 1e-3  << ","<< (double) fwd1 * 1e-3 << "\n";
+               <<unsigned(fw_tos) << "," << (double) intd1 * 1e-3  << ","<< (double) fwd1 * 1e-3 << ","<<std::to_string(plen) << "\n";
 
 }
 

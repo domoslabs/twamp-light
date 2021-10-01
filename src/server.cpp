@@ -48,16 +48,16 @@ ReflectorPacket craft_reflector_packet(SenderPacket *sender_packet, msghdr sende
     packet.time = get_timestamp();
     return packet;
 }
-void handle_test_packet(SenderPacket *packet, msghdr sender_msg, int fd, const Args& args){
+void handle_test_packet(SenderPacket *packet, msghdr sender_msg, int fd, size_t payload_len, const Args& args){
     ReflectorPacket reflector_packet = craft_reflector_packet(packet, sender_msg);
     // Overwrite and reuse the sender message with our own data and send it back, instead of creating a new one.
     auto *hdr = (sockaddr_in *)sender_msg.msg_name;
     char *ip = inet_ntoa(hdr->sin_addr);
-    print_metrics_server(ip, htons(hdr->sin_port), std::stoi(args.local_port), reflector_packet.sender_tos, 0, &reflector_packet);
+    print_metrics_server(ip, htons(hdr->sin_port), std::stoi(args.local_port), reflector_packet.sender_tos, 0, payload_len, &reflector_packet);
     msghdr message = sender_msg;
     struct iovec iov[1];
     iov[0].iov_base=&reflector_packet;
-    iov[0].iov_len=sizeof(reflector_packet);
+    iov[0].iov_len=payload_len;
     message.msg_iov=iov;
     message.msg_iovlen=1;
 
@@ -125,8 +125,8 @@ int main(int argc, char **argv) {
         message.msg_control = control_buffer;
         message.msg_controllen = control_length;
 
-        ssize_t count = recvmsg(fd, &message, 0);
-        if (count == -1) {
+        ssize_t payload_len = recvmsg(fd, &message, 0);
+        if (payload_len == -1) {
             if(errno == 11){
                 std::cerr << "Socket timed out." << std::endl;
                 std::exit(EXIT_FAILURE);
@@ -138,7 +138,7 @@ int main(int argc, char **argv) {
             std::cout << "Datagram too large for buffer: truncated" << std::endl;
         } else {
             auto *rec = (SenderPacket *) buffer;
-            handle_test_packet(rec, message, fd, args);
+            handle_test_packet(rec, message, fd, payload_len, args);
         }
     }
 }
