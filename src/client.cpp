@@ -28,6 +28,7 @@ Args parse_args(int argc, char **argv){
     args.payload_lens.push_back(150);
     uint8_t dscp = 0, tos = 0;
     CLI::App app{"Twamp-Light implementation written by Domos."};
+    app.option_defaults()->always_capture_default(true);
     app.add_option("address", args.remote_host, "The address of the remote TWAMP Server.");
     app.add_option("-a, --local_address", args.local_host, "The address to set up the local socket on. Auto-selects by default.");
     app.add_option("-P, --local_port", args.local_port, "The port to set up the local socket on.");
@@ -36,11 +37,11 @@ Args parse_args(int argc, char **argv){
             "The payload length. Must be in range (42, 1473). Can be multiple values, in which case it is selected randomly.")
             ->default_str(vectorToString(args.payload_lens, " "))->check(CLI::Range(42, 1473));
     app.add_option("-n, --num_samples", args.num_samples, "Number of samples to expect.");
-    app.add_option("-t, --timeout", args.timeout, "How long (in seconds) to keep the socket open, when no packets are incoming.");
+    app.add_option("-t, --timeout", args.timeout, "How long (in seconds) to keep the socket open, when no packets are incoming.")->default_str(std::to_string(args.timeout));
     app.add_option("-d, --delay", args.delay_millis, "How long (in millis) to wait between sending each packet.");
     app.add_option("-s, --seed", args.seed, "Seed for the RNG. 0 means random.");
-    auto opt_tos = app.add_option("-T, --tos", tos, "The TOS value (<256).")->check(CLI::Range(256));
-    auto opt_dscp = app.add_option("-D, --dscp", dscp, "The DSCP value (<64).")->check(CLI::Range(64));
+    auto opt_tos = app.add_option("-T, --tos", tos, "The TOS value (<256).")->check(CLI::Range(256))->default_str(std::to_string(args.snd_tos));
+    auto opt_dscp = app.add_option("-D, --dscp", dscp, "The DSCP value (<64).")->check(CLI::Range(64))->default_str(std::to_string(args.dscp_snd));
     opt_tos->excludes(opt_dscp);
     opt_dscp->excludes(opt_tos);
     try{
