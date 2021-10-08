@@ -220,7 +220,7 @@ print_metrics(const char *server, uint16_t snd_port, uint16_t rcv_port, uint8_t 
                    << "FWD,"<< "BWD,"<< "PLEN," << "LOSS" << "\n";
         header_printed = true;
     }
-    std::cout << std::fixed << (double) t_sender_usec * 1e-3 << "," << server<< ","<< snd_sn<< ","<< rcv_sn<< ","<< std::to_string(snd_port)<< ","
+    std::cout << std::fixed << (double) t_sender_usec * 1e-3 << "," << server<< ","<< snd_sn<< ","<< rcv_sn<< ","<< snd_port<< ","
                << rcv_port<< ","<< sync<< ","<< unsigned(pack->sender_ttl)<< ","<< unsigned(sw_ttl)<< ","
                << unsigned(snd_tos)<< ","<< '-'<< ","<< unsigned(sw_tos)<< ","<<(double) rtt * 1e-3<< ","
                <<(double) intd* 1e-3<< ","<< (double) fwd * 1e-3<< ","<< (double) swd * 1e-3<< ","<< plen<< "," << packets_lost << "\n";

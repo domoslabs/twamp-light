@@ -51,9 +51,12 @@ ReflectorPacket craft_reflector_packet(SenderPacket *sender_packet, msghdr sende
 void handle_test_packet(SenderPacket *packet, msghdr sender_msg, int fd, size_t payload_len, const Args& args){
     ReflectorPacket reflector_packet = craft_reflector_packet(packet, sender_msg);
     // Overwrite and reuse the sender message with our own data and send it back, instead of creating a new one.
-    auto *addr = (sockaddr_in *)sender_msg.msg_name;
-    char *ip = inet_ntoa(addr->sin_addr);
-    print_metrics_server(ip, ntohs(addr->sin_port), std::stoi(args.local_port), reflector_packet.sender_tos, 0, payload_len, &reflector_packet);
+    char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
+    if (getnameinfo((sockaddr *)sender_msg.msg_name, sender_msg.msg_namelen, hbuf, sizeof(hbuf), sbuf,
+                    sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV) != 0){
+        std::cerr << "Error in getnameinfo" << std::endl;
+    }
+    print_metrics_server(hbuf, std::stol(sbuf), std::stoi(args.local_port), reflector_packet.sender_tos, 0, payload_len, &reflector_packet);
     msghdr message = sender_msg;
     struct iovec iov[1];
     iov[0].iov_base=&reflector_packet;
@@ -122,8 +125,8 @@ int main(int argc, char **argv) {
         message.msg_namelen = sizeof(&src_addr);
         message.msg_iov = iov;
         message.msg_iovlen = 1;
-        message.msg_control = control_buffer;
-        message.msg_controllen = control_length;
+        message.msg_control = nullptr;
+        message.msg_controllen = 1;
 
         ssize_t payload_len = recvmsg(fd, &message, 0);
         if (payload_len == -1) {

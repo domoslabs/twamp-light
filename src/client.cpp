@@ -66,14 +66,16 @@ SenderPacket craft_sender_packet(int idx){
     packet.error_estimate = htons(0x8001); // Sync = 1, Multiplier = 1.
     return packet;
 }
-uint16_t num_lost = 0;
 void handle_reflector_packet(ReflectorPacket *reflectorPacket, msghdr msghdr, int fd, size_t payload_len, uint16_t packet_loss, const Args& args) {
     IPHeader ipHeader = get_ip_header(msghdr);
     TWAMPTimestamp ts = get_timestamp();
-    if(reflectorPacket->sender_seq_number != reflectorPacket->seq_number){
-        num_lost++;
+
+    char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
+    if (getnameinfo((sockaddr *)msghdr.msg_name, msghdr.msg_namelen, hbuf, sizeof(hbuf), sbuf,
+                    sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV) != 0){
+        std::cerr << "Error in getnameinfo" << std::endl;
     }
-    print_metrics(args.remote_host.c_str(), std::stoi(args.local_port), std::stoi(args.remote_port), reflectorPacket->sender_tos, ipHeader.ttl,
+    print_metrics(hbuf, std::stoi(args.local_port), std::stol(sbuf), reflectorPacket->sender_tos, ipHeader.ttl,
                   ipHeader.tos, &ts,
                   reflectorPacket, payload_len, packet_loss, nullptr, nullptr);
 }
