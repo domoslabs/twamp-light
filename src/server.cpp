@@ -100,8 +100,6 @@ int main(int argc, char **argv) {
         std::cerr << strerror(errno) << std::endl;
         return -1;
     }
-    // Free the socket address info, since it is no longer needed. ??
-    freeaddrinfo(res);
     // Read incoming datagrams
     bool run = true;
     int counter = 0;
