@@ -56,7 +56,6 @@ void handle_test_packet(SenderPacket *packet, msghdr sender_msg, int fd, size_t 
                     sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV) != 0){
         std::cerr << "Error in getnameinfo" << std::endl;
     }
-    std::cout << sbuf << std::endl;
     print_metrics_server(hbuf, std::stol(sbuf), std::stoi(args.local_port), reflector_packet.sender_tos, 0, payload_len, &reflector_packet);
     msghdr message = sender_msg;
     struct iovec iov[1];
