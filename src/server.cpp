@@ -51,9 +51,9 @@ ReflectorPacket craft_reflector_packet(SenderPacket *sender_packet, msghdr sende
 void handle_test_packet(SenderPacket *packet, msghdr sender_msg, int fd, size_t payload_len, const Args& args){
     ReflectorPacket reflector_packet = craft_reflector_packet(packet, sender_msg);
     // Overwrite and reuse the sender message with our own data and send it back, instead of creating a new one.
-    auto *hdr = (sockaddr_in *)sender_msg.msg_name;
-    char *ip = inet_ntoa(hdr->sin_addr);
-    print_metrics_server(ip, (hdr->sin_port), std::stoi(args.local_port), reflector_packet.sender_tos, 0, payload_len, &reflector_packet);
+    auto *addr = (sockaddr_in *)sender_msg.msg_name;
+    char *ip = inet_ntoa(addr->sin_addr);
+    print_metrics_server(ip, ntohs(addr->sin_port), std::stoi(args.local_port), reflector_packet.sender_tos, 0, payload_len, &reflector_packet);
     msghdr message = sender_msg;
     struct iovec iov[1];
     iov[0].iov_base=&reflector_packet;
