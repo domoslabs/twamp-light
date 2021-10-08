@@ -186,7 +186,7 @@ IPHeader get_ip_header(msghdr hdr) {
 bool header_printed = false;
 uint64_t
 print_metrics(const char *server, uint16_t snd_port, uint16_t rcv_port, uint8_t snd_tos, uint8_t sw_ttl, uint8_t sw_tos,
-              TWAMPTimestamp *recv_resp_time, const ReflectorPacket *pack, uint16_t plen, char *device_mac,
+              TWAMPTimestamp *recv_resp_time, const ReflectorPacket *pack, uint16_t plen, uint16_t packets_lost, char *device_mac,
               char *radio_interface) {
     /* Compute timestamps in usec */
     uint64_t t_sender_usec = get_usec(&pack->sender_time);
@@ -217,13 +217,13 @@ print_metrics(const char *server, uint16_t snd_port, uint16_t rcv_port, uint8_t 
     if(!header_printed){
         std::cout << "Time,"<< "IP,"<< "Snd#,"<< "Rcv#,"<< "SndPort,"<< "RscPort,"<< "Sync,"<< "FW_TTL,"
                    << "SW_TTL,"<< "SndTOS,"<< "FW_TOS,"<< "SW_TOS,"<< "RTT,"<< "IntD,"
-                   << "FWD,"<< "SWD,"<< "PLEN" << "\n";
+                   << "FWD,"<< "BWD,"<< "PLEN," << "LOSS" << "\n";
         header_printed = true;
     }
-    std::cout << std::fixed << (double) t_sender_usec * 1e-3 << "," << server<< ","<< snd_sn<< ","<< rcv_sn<< ","<< snd_port<< ","
+    std::cout << std::fixed << (double) t_sender_usec * 1e-3 << "," << server<< ","<< snd_sn<< ","<< rcv_sn<< ","<< std::to_string(snd_port)<< ","
                << rcv_port<< ","<< sync<< ","<< unsigned(pack->sender_ttl)<< ","<< unsigned(sw_ttl)<< ","
                << unsigned(snd_tos)<< ","<< '-'<< ","<< unsigned(sw_tos)<< ","<<(double) rtt * 1e-3<< ","
-               <<(double) intd* 1e-3<< ","<< (double) fwd * 1e-3<< ","<< (double) swd * 1e-3<< ","<< plen << "\n";
+               <<(double) intd* 1e-3<< ","<< (double) fwd * 1e-3<< ","<< (double) swd * 1e-3<< ","<< plen<< "," << packets_lost << "\n";
 
     return t_recvresp_usec - t_sender_usec;
 

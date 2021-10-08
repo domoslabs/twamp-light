@@ -16,7 +16,7 @@ struct Args {
     std::vector<uint16_t> payload_lens = std::vector<uint16_t>();
     uint8_t snd_tos = 0;
     uint8_t dscp_snd = 0;
-    uint32_t delay_millis = 1000;
+    uint32_t delay_millis = 200;
     uint32_t num_samples = 10;
     uint8_t timeout = 10;
     uint32_t seed = 0;
@@ -67,7 +67,7 @@ SenderPacket craft_sender_packet(int idx){
     return packet;
 }
 uint16_t num_lost = 0;
-void handle_reflector_packet(ReflectorPacket *reflectorPacket, msghdr msghdr, int fd, size_t payload_len, const Args& args) {
+void handle_reflector_packet(ReflectorPacket *reflectorPacket, msghdr msghdr, int fd, size_t payload_len, uint16_t packet_loss, const Args& args) {
     IPHeader ipHeader = get_ip_header(msghdr);
     TWAMPTimestamp ts = get_timestamp();
     if(reflectorPacket->sender_seq_number != reflectorPacket->seq_number){
@@ -75,7 +75,7 @@ void handle_reflector_packet(ReflectorPacket *reflectorPacket, msghdr msghdr, in
     }
     print_metrics(args.remote_host.c_str(), std::stoi(args.local_port), std::stoi(args.remote_port), reflectorPacket->sender_tos, ipHeader.ttl,
                   ipHeader.tos, &ts,
-                  reflectorPacket, payload_len, nullptr, nullptr);
+                  reflectorPacket, payload_len, packet_loss, nullptr, nullptr);
 }
 void send_packet(addrinfo* remote_address_info, int idx, int fd, size_t payload_len){
     // Send the UDP packet
@@ -96,7 +96,7 @@ void send_packet(addrinfo* remote_address_info, int idx, int fd, size_t payload_
         throw std::runtime_error(std::string("Sending UDP message failed with error."));
     }
 }
-void await_response(int fd, size_t payload_len, const Args& args) {
+bool await_response(int fd, size_t payload_len, uint16_t  packet_loss, const Args& args) {
     // Read incoming datagram
     char buffer[sizeof(ReflectorPacket)]; //We should only be receiving ReflectorPackets
     struct sockaddr *src_addr;
@@ -116,8 +116,7 @@ void await_response(int fd, size_t payload_len, const Args& args) {
     ssize_t count=recvmsg(fd, &incoming_msg, 0);
     if (count==-1) {
         if(errno == 11){
-            std::cerr << "Socket timed out." << std::endl;
-            std::exit(EXIT_FAILURE);
+            return false;
         } else {
             printf("%s", strerror(errno));
         }
@@ -126,9 +125,9 @@ void await_response(int fd, size_t payload_len, const Args& args) {
         std::cout << "Datagram too large for buffer: truncated" << std::endl;
     } else {
         auto *rec = (ReflectorPacket *)buffer;
-        handle_reflector_packet(rec, incoming_msg, fd, payload_len, args);
+        handle_reflector_packet(rec, incoming_msg, fd, payload_len, packet_loss, args);
     }
-
+    return true;
 }
 int main(int argc, char **argv) {
     Args args = parse_args(argc, argv);
@@ -166,10 +165,14 @@ int main(int argc, char **argv) {
         std::cerr << strerror(errno) << std::endl;
         throw;
     }
+    uint16_t lost_packets = 0;
     for(int i = 0; i < args.num_samples; i++){
         size_t payload_len = *select_randomly(args.payload_lens.begin(), args.payload_lens.end(), args.seed);
         send_packet(remote_address_info, i, fd, payload_len);
-        await_response(fd, payload_len, args);
+        bool response = await_response(fd, payload_len, lost_packets, args);
+        if(!response){
+            lost_packets++;
+        }
         usleep(args.delay_millis*1000);
     }
 }
