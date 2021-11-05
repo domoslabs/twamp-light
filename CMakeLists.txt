@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0)
-project(domos_twamp_light)
+project(twamp-light)
 set(CMAKE_CXX_STANDARD 11)
 set(
         SOURCES
