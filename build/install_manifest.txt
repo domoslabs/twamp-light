@@ -1,2 +1,0 @@
-/usr/local/bin/twamp-light-client
-/usr/local/bin/twamp-light-server
