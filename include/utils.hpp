@@ -28,15 +28,15 @@ typedef struct ip_header {
 } IPHeader;
 #define TST_PKT_SIZE 1472       //1472 (MTU 1514)
 /* Session-Sender TWAMP-Test packet for Unauthenticated mode */
-typedef struct test_packet {
+struct SenderPacket {
     uint32_t seq_number;
     TWAMPTimestamp time;
     uint16_t error_estimate;
     uint8_t padding[TST_PKT_SIZE - 14];
-} SenderPacket;
+};
 
 /* Session-Reflector TWAMP-Test packet for Unauthenticated mode */
-typedef struct reflector_unauth_packet {
+struct ReflectorPacket {
     uint32_t seq_number;
     TWAMPTimestamp time;
     uint16_t error_estimate;
@@ -49,7 +49,7 @@ typedef struct reflector_unauth_packet {
     uint8_t sender_ttl;
     uint8_t sender_tos;
     uint8_t padding[TST_PKT_SIZE - 42];
-} ReflectorPacket;
+};
 
 void timeval_to_timestamp(const struct timeval *tv, TWAMPTimestamp * ts);
 
@@ -60,11 +60,6 @@ uint64_t get_usec(const TWAMPTimestamp * ts);
 TWAMPTimestamp get_timestamp();
 
 IPHeader get_ip_header(msghdr message);
-
-uint64_t
-print_metrics(const char *server, uint16_t snd_port, uint16_t rcv_port, uint8_t snd_tos, uint8_t sw_ttl, uint8_t sw_tos,
-              TWAMPTimestamp *recv_resp_time, const ReflectorPacket *pack, uint16_t plen, uint16_t packets_lost, char *device_mac,
-              char *radio_interface);
 
 void print_metrics_server(const char *addr_cl, uint16_t snd_port, uint16_t rcv_port,
                           uint8_t snd_tos, uint8_t fw_tos, uint16_t plen,

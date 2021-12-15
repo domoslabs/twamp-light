@@ -13,7 +13,7 @@
  *
  */
 
-#include "twamp_light.hpp"
+#include "utils.hpp"
 #include <cinttypes>
 #include <sys/time.h>
 #include <arpa/inet.h>
@@ -183,53 +183,9 @@ IPHeader get_ip_header(msghdr hdr) {
     };
     return ipHeader;
 }
+
+
 bool header_printed = false;
-uint64_t
-print_metrics(const char *server, uint16_t snd_port, uint16_t rcv_port, uint8_t snd_tos, uint8_t sw_ttl, uint8_t sw_tos,
-              TWAMPTimestamp *recv_resp_time, const ReflectorPacket *pack, uint16_t plen, uint16_t packets_lost, char *device_mac,
-              char *radio_interface) {
-    /* Compute timestamps in usec */
-    uint64_t t_sender_usec = get_usec(&pack->sender_time);
-    uint64_t t_receive_usec = get_usec(&pack->receive_time);
-    uint64_t t_reflsender_usec = get_usec(&pack->time);
-    uint64_t t_recvresp_usec = get_usec(recv_resp_time);
-
-    /* Compute delays */
-    int64_t fwd = t_receive_usec - t_sender_usec;
-    int64_t swd = t_recvresp_usec - t_reflsender_usec;
-    int64_t intd = t_reflsender_usec - t_receive_usec;
-    int64_t rtt = t_recvresp_usec - t_sender_usec;
-    char sync = 'Y';
-    if ((fwd < 0) || (swd < 0)) {
-        sync = 'N';
-    }
-
-    /*Sequence number */
-    uint32_t rcv_sn = ntohl(pack->seq_number);
-    uint32_t snd_sn = ntohl(pack->sender_seq_number);
-
-    if (device_mac != nullptr && radio_interface != nullptr) {
-        print_chanims_stats(radio_interface);
-        print_sta_info(radio_interface, device_mac);
-        fprintf(stdout, "%s,%s,", device_mac, radio_interface);
-    }
-
-    if(!header_printed){
-        std::cout << "Time,"<< "IP,"<< "Snd#,"<< "Rcv#,"<< "SndPort,"<< "RscPort,"<< "Sync,"<< "FW_TTL,"
-                   << "SW_TTL,"<< "SndTOS,"<< "FW_TOS,"<< "SW_TOS,"<< "RTT,"<< "IntD,"
-                   << "FWD,"<< "BWD,"<< "PLEN," << "LOSS" << "\n";
-        header_printed = true;
-    }
-    std::cout << std::fixed << (double) t_sender_usec * 1e-3 << "," << server<< ","<< snd_sn<< ","<< rcv_sn<< ","<< snd_port<< ","
-               << rcv_port<< ","<< sync<< ","<< unsigned(pack->sender_ttl)<< ","<< unsigned(sw_ttl)<< ","
-               << unsigned(snd_tos)<< ","<< '-'<< ","<< unsigned(sw_tos)<< ","<<(double) rtt * 1e-3<< ","
-               <<(double) intd* 1e-3<< ","<< (double) fwd * 1e-3<< ","<< (double) swd * 1e-3<< ","<< plen<< "," << packets_lost << "\n";
-
-    return t_recvresp_usec - t_sender_usec;
-
-}
-
-
 void print_metrics_server(const char *addr_cl, uint16_t snd_port, uint16_t rcv_port,
                           uint8_t snd_tos, uint8_t fw_tos, uint16_t plen,
                           const ReflectorPacket *pack) {
