@@ -11,6 +11,7 @@
 #include <vector>
 #include <iterator>
 #include <sstream>
+#include "packets.h"
 
 #define HDR_TTL		255         /* TTL=255 in TWAMP for IP Header */
 #define SERVER_PORT 862
@@ -18,38 +19,11 @@
 
 /* TWAMP timestamp is NTP time (RFC1305).
  * Should be in network byte order!      */
-typedef struct twamp_timestamp {
-    uint32_t integer;
-    uint32_t fractional;
-} TWAMPTimestamp;
 typedef struct ip_header {
     uint8_t ttl;
     uint8_t tos;
 } IPHeader;
-#define TST_PKT_SIZE 1472       //1472 (MTU 1514)
-/* Session-Sender TWAMP-Test packet for Unauthenticated mode */
-struct SenderPacket {
-    uint32_t seq_number;
-    TWAMPTimestamp time;
-    uint16_t error_estimate;
-    uint8_t padding[TST_PKT_SIZE - 14];
-};
 
-/* Session-Reflector TWAMP-Test packet for Unauthenticated mode */
-struct ReflectorPacket {
-    uint32_t seq_number;
-    TWAMPTimestamp time;
-    uint16_t error_estimate;
-    uint8_t mbz1[2];
-    TWAMPTimestamp receive_time;
-    uint32_t sender_seq_number;
-    TWAMPTimestamp sender_time;
-    uint16_t sender_error_estimate;
-    uint8_t mbz2[2];
-    uint8_t sender_ttl;
-    uint8_t sender_tos;
-    uint8_t padding[TST_PKT_SIZE - 42];
-};
 
 void timeval_to_timestamp(const struct timeval *tv, TWAMPTimestamp * ts);
 
@@ -60,10 +34,6 @@ uint64_t get_usec(const TWAMPTimestamp * ts);
 TWAMPTimestamp get_timestamp();
 
 IPHeader get_ip_header(msghdr message);
-
-void print_metrics_server(const char *addr_cl, uint16_t snd_port, uint16_t rcv_port,
-                          uint8_t snd_tos, uint8_t fw_tos, uint16_t plen,
-                          const ReflectorPacket * pack);
 void set_socket_options(int socket, uint8_t ip_ttl, uint8_t timeout_secs);
 void set_socket_tos(int socket, uint8_t ip_tos);
 template <class T>

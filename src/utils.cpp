@@ -62,85 +62,6 @@ uint64_t get_usec(const TWAMPTimestamp *ts) {
     timestamp_to_timeval(ts, &tv);
     return (uint64_t) tv.tv_sec * 1000000 + (uint64_t) tv.tv_usec;
 }
-
-void print_chanims_stats(char *interface) {
-    FILE *fp;
-    char path[1035];
-    char command[128];
-    sprintf(command, "/usr/sbin/wlctl -i %s chanim_stats", interface);
-    fp = popen(command, "r");
-    if (fp == nullptr) {
-        printf("Failed to run wlctl chanim_stats\n");
-    } else {
-        int line = 0;
-        while (fgets(path, sizeof(path) - 1, fp) != nullptr) {
-            if (line == 2) {
-                for (int i = 0; i < 1035; i++) {
-                    if (path[i] == '\t') {
-                        path[i] = ',';
-                    } else if (path[i] == 0) {
-                        break;
-                    } else if (path[i] == '\n') {
-                        path[i] = ',';
-                    }
-                }
-                fprintf(stderr, "%s", path);
-            }
-            line++;
-        }
-        pclose(fp);
-    }
-}
-
-void print_sta_info(char *interface, char *mac) {
-    FILE *fp;
-    char path[1035];
-    char command[128];
-    sprintf(command, "/usr/sbin/wlctl -i %s sta_info %s", interface, mac);
-    fp = popen(command, "r");
-    if (fp == nullptr) {
-        printf("Failed to run %s\n", command);
-    } else {
-        int line = 0;
-        while (fgets(path, sizeof(path) - 1, fp) != NULL) {
-            line++;
-            if (line <= 8) continue;
-            if (line >= 37) break;
-
-            char *point = strchr(path, ':');
-            if (point == nullptr) {
-                continue;
-            }
-            point += 2;
-            char *tmp = point;
-            if (line == 22 || line == 23) {
-                while (*tmp != 0) {
-                    if (*tmp == ' ') {
-                        *tmp = 0;
-                        break;
-                    }
-                    tmp++;
-                }
-            } else {
-                while (*tmp != 0) {
-                    if (*tmp == ' ') {
-                        *tmp = ',';
-                    }
-                    if (*tmp == '\n') {
-                        *tmp = 0;
-                        break;
-                    }
-                    tmp++;
-                }
-            }
-
-            fprintf(stderr, "%s,", point);
-
-        }
-        pclose(fp);
-    }
-}
-
 /**
  * Session-Reflector implementations SHOULD fetch
       the TTL/Hop Limit value from the IP header of the packet,
@@ -182,43 +103,6 @@ IPHeader get_ip_header(msghdr hdr) {
             tos
     };
     return ipHeader;
-}
-
-
-bool header_printed = false;
-void print_metrics_server(const char *addr_cl, uint16_t snd_port, uint16_t rcv_port,
-                          uint8_t snd_tos, uint8_t fw_tos, uint16_t plen,
-                          const ReflectorPacket *pack) {
-
-    /* Compute timestamps in usec */
-    uint64_t t_sender_usec1 = get_usec(&pack->sender_time);
-    uint64_t t_receive_usec1 = get_usec(&pack->receive_time);
-    uint64_t t_reflsender_usec1 = get_usec(&pack->time);
-
-    /* Compute delays */
-    int64_t fwd1 = t_receive_usec1 - t_sender_usec1;
-    int64_t intd1 = t_reflsender_usec1 - t_receive_usec1;
-    char sync1 = 'Y';
-    if (fwd1 < 0) {
-        sync1 = 'N';
-    }
-    /* Sequence number */
-    uint32_t snd_nb = ntohl(pack->sender_seq_number);
-    uint32_t rcv_nb = ntohl(pack->seq_number);
-
-    /* Sender TOS with ECN from FW TOS */
-    snd_tos =
-            snd_tos + (fw_tos & 0x3) - (((fw_tos & 0x2) >> 1) & (fw_tos & 0x1));
-    if(!header_printed){
-
-        std::cout << "Time," << "IP,"<< "Snd#,"<< "Rcv#,"<< "SndPort,"<< "RscPort,"<< "Sync,"<< "FW_TTL,"
-                   << "SndTOS,"<< "FW_TOS,"<< "IntD,"<< "FWD," << "PLEN" << "\n";
-        header_printed = true;
-    }
-    std::cout << std::fixed << (double) t_sender_usec1 << "," << addr_cl << ","  << snd_nb << ","
-               <<rcv_nb << "," << snd_port << "," << rcv_port << "," << sync1 << "," << unsigned(pack->sender_ttl) << ","<< unsigned(snd_tos) << ","
-               <<unsigned(fw_tos) << "," << (double) intd1 * 1e-3  << ","<< (double) fwd1 * 1e-3 << ","<<std::to_string(plen) << "\n";
-
 }
 
 void set_socket_options(int socket, uint8_t ip_ttl, uint8_t timeout_secs) {
