@@ -10,6 +10,9 @@
 #include "utils.hpp"
 
 Server::Server(const Args& args) {
+    if(args.time_update){
+        forceTimeUpdate();
+    }
     this->args = args;
     // Construct socket address
     struct addrinfo hints = {};

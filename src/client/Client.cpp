@@ -10,6 +10,9 @@
 #include "utils.hpp"
 
 Client::Client(const Args& args) {
+    if(args.time_update){
+        forceTimeUpdate();
+    }
     // Construct remote socket address
     struct addrinfo hints{};
     memset(&hints,0,sizeof(hints));
