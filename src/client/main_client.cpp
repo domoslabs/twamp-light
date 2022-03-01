@@ -23,7 +23,8 @@ Args parse_args(int argc, char **argv){
             "The payload length. Must be in range (42, 1473). Can be multiple values, in which case it will be sampled randomly.")
             ->default_str(vectorToString(args.payload_lens, " "))->check(CLI::Range(42, 1473));
     app.add_option("-n, --num_samples", args.num_samples, "Number of samples to expect.");
-    app.add_option("-t, --timeout", args.timeout, "How long (in seconds) to keep the socket open, when no packets are incoming.")->default_str(std::to_string(args.timeout));
+    app.add_option("-t, --timeout", args.timeout, "How long (in seconds) to wait for response before retrying.")->default_str(std::to_string(args.timeout));
+    app.add_option("-r, --retries", args.max_retries, "How many retries before terminating. Cannot be higher than the number of samples, and adjusts accordingly.")->default_str(std::to_string(args.max_retries));
     app.add_option("-d, --delay", args.delays, "How long (in millis) to wait between sending each packet. Can be multiple values, in which case it will be sampled randomly.")->default_str(vectorToString(args.delays, " "));
     app.add_option("-s, --seed", args.seed, "Seed for the RNG. 0 means random.");
     auto opt_tos = app.add_option("-T, --tos", tos, "The TOS value (<256).")->check(CLI::Range(256))->default_str(std::to_string(args.snd_tos));
@@ -42,12 +43,16 @@ Args parse_args(int argc, char **argv){
     if(*opt_dscp){
         args.snd_tos = dscp << 2;
     }
+    if(args.max_retries > args.num_samples){
+        args.max_retries = args.num_samples;
+    }
     return args;
 }
 int main(int argc, char **argv) {
     Args args = parse_args(argc, argv);
     Client client = Client(args);
     uint16_t lost_packets = 0;
+    uint16_t retries = 0;
     for(int i = 0; i < args.num_samples; i++){
         size_t payload_len = *select_randomly(args.payload_lens.begin(), args.payload_lens.end(), args.seed);
         uint16_t delay = *select_randomly(args.delays.begin(), args.delays.end(), args.seed);
@@ -55,6 +60,13 @@ int main(int argc, char **argv) {
         bool response = client.awaitResponse(payload_len, lost_packets, args);
         if(!response){
             lost_packets++;
+            retries++;
+            if(retries >= args.max_retries){
+                std::cerr << "Too high packet loss streak, terminating..." << std::endl;
+                std::exit(EXIT_FAILURE);
+            }
+        } else {
+            retries = 0;
         }
         usleep(delay*1000);
     }
