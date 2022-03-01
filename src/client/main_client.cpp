@@ -26,7 +26,6 @@ Args parse_args(int argc, char **argv){
     app.add_option("-t, --timeout", args.timeout, "How long (in seconds) to keep the socket open, when no packets are incoming.")->default_str(std::to_string(args.timeout));
     app.add_option("-d, --delay", args.delays, "How long (in millis) to wait between sending each packet. Can be multiple values, in which case it will be sampled randomly.")->default_str(vectorToString(args.delays, " "));
     app.add_option("-s, --seed", args.seed, "Seed for the RNG. 0 means random.");
-    app.add_flag("--time_update", args.time_update, "Enables forced time update from NTP server");
     auto opt_tos = app.add_option("-T, --tos", tos, "The TOS value (<256).")->check(CLI::Range(256))->default_str(std::to_string(args.snd_tos));
     auto opt_dscp = app.add_option("-D, --dscp", dscp, "The DSCP value (<64).")->check(CLI::Range(64))->default_str(std::to_string(args.dscp_snd));
     opt_tos->excludes(opt_dscp);

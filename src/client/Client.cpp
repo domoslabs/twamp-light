@@ -10,9 +10,6 @@
 #include "utils.hpp"
 
 Client::Client(const Args& args) {
-    if(args.time_update){
-        forceTimeUpdate();
-    }
     // Construct remote socket address
     struct addrinfo hints{};
     memset(&hints,0,sizeof(hints));
@@ -102,6 +99,7 @@ bool Client::awaitResponse(size_t payload_len, uint16_t  packet_loss, const Args
         throw;
     } else if (incoming_msg.msg_flags & MSG_TRUNC) {
         std::cout << "Datagram too large for buffer: truncated" << std::endl;
+        return false;
     } else {
         auto *rec = (ReflectorPacket *)buffer;
         handleReflectorPacket(rec, incoming_msg, payload_len, packet_loss, args);

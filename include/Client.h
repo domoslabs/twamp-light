@@ -21,7 +21,6 @@ struct Args {
     uint32_t num_samples = 10;
     uint8_t timeout = 10;
     uint32_t seed = 0;
-    bool time_update = false;
 };
 class Client {
 public:

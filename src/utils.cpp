@@ -189,10 +189,3 @@ void set_socket_tos(int socket, uint8_t ip_tos)
             "No way to set the TOS value for leaving packets on that platform.\n");
 #endif
 }
-
-void forceTimeUpdate() {
-    // Not 100% accurate, but good enough for our use case.
-    // The following commands forces a time-sync:
-    system("sudo timedatectl set-ntp off");
-    system("sudo timedatectl set-ntp on");
-}
