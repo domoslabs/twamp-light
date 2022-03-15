@@ -76,7 +76,7 @@ SenderPacket Client::craftSenderPacket(int idx){
 bool Client::awaitResponse(size_t payload_len, uint16_t  packet_loss, const Args& args) {
     // Read incoming datagram
     char buffer[sizeof(ReflectorPacket)]; //We should only be receiving ReflectorPackets
-    struct sockaddr *src_addr;
+    struct sockaddr src_addr{};
 
     struct iovec iov[1];
     iov[0].iov_base=buffer;
@@ -84,7 +84,7 @@ bool Client::awaitResponse(size_t payload_len, uint16_t  packet_loss, const Args
 
     struct msghdr incoming_msg{};
     incoming_msg.msg_name=&src_addr;
-    incoming_msg.msg_namelen=sizeof(&src_addr);
+    incoming_msg.msg_namelen=sizeof(src_addr);
     incoming_msg.msg_iov=iov;
     incoming_msg.msg_iovlen=1;
     incoming_msg.msg_control= nullptr;

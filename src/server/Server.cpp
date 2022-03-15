@@ -54,7 +54,7 @@ void Server::listen() {
             }
         }
         char buffer[sizeof(SenderPacket)]; //We should only be receiving test_packets
-        struct sockaddr *src_addr;
+        struct sockaddr src_addr{};
 
         struct iovec iov[1];
         iov[0].iov_base = buffer;
@@ -64,7 +64,7 @@ void Server::listen() {
 
         struct msghdr message{};
         message.msg_name = &src_addr;
-        message.msg_namelen = sizeof(&src_addr);
+        message.msg_namelen = sizeof(src_addr);
         message.msg_iov = iov;
         message.msg_iovlen = 1;
         message.msg_control = nullptr;
