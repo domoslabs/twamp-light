@@ -110,9 +110,8 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msgh
     IPHeader ipHeader = get_ip_header(msghdr);
     TWAMPTimestamp ts = get_timestamp();
     sockaddr_in *sock = ((sockaddr_in *)msghdr.msg_name);
-    char host[INET_ADDRSTRLEN];
+    char* host = inet_ntoa(sock->sin_addr);
     uint16_t  port = ntohs(sock->sin_port);
-    inet_ntop(AF_INET, &sock->sin_addr, host, INET_ADDRSTRLEN);
     printMetrics(host, std::stoi(args.local_port), port, reflectorPacket->sender_tos, ipHeader.ttl,
                  ipHeader.tos, &ts,
                  reflectorPacket, payload_len, packet_loss);

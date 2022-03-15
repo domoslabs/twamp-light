@@ -92,9 +92,8 @@ void Server::handleTestPacket(SenderPacket *packet, msghdr sender_msg, size_t pa
     ReflectorPacket reflector_packet = craftReflectorPacket(packet, sender_msg);
     sockaddr_in *sock = ((sockaddr_in *)sender_msg.msg_name);
     // Overwrite and reuse the sender message with our own data and send it back, instead of creating a new one.
-    char host[INET_ADDRSTRLEN];
+    char* host = inet_ntoa(sock->sin_addr);
     uint16_t  port = ntohs(sock->sin_port);
-    inet_ntop(AF_INET, &sock->sin_addr, host, INET_ADDRSTRLEN);
     printMetrics(host, port, std::stoi(args.local_port), reflector_packet.sender_tos, 0, payload_len, &reflector_packet);
     msghdr message = sender_msg;
 
