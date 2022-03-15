@@ -17,9 +17,10 @@ struct Args {
     std::vector<uint16_t> payload_lens = std::vector<uint16_t>();
     uint8_t snd_tos = 0;
     uint8_t dscp_snd = 0;
-    uint32_t delay_millis = 200;
+    std::vector<uint16_t> delays = std::vector<uint16_t>();;
     uint32_t num_samples = 10;
     uint8_t timeout = 10;
+    uint8_t max_retries = 10;
     uint32_t seed = 0;
 };
 class Client {
