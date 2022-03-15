@@ -6,6 +6,7 @@
 #include <netdb.h>
 #include <cstring>
 #include <iostream>
+#include <arpa/inet.h>
 #include "Server.h"
 #include "utils.hpp"
 
@@ -89,14 +90,14 @@ void Server::listen() {
 
 void Server::handleTestPacket(SenderPacket *packet, msghdr sender_msg, size_t payload_len) {
     ReflectorPacket reflector_packet = craftReflectorPacket(packet, sender_msg);
+    sockaddr_in *sock = ((sockaddr_in *)sender_msg.msg_name);
     // Overwrite and reuse the sender message with our own data and send it back, instead of creating a new one.
-    char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
-    if (getnameinfo((sockaddr *)sender_msg.msg_name, sender_msg.msg_namelen, hbuf, sizeof(hbuf), sbuf,
-                    sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV) != 0){
-        std::cerr << "Error in getnameinfo" << std::endl;
-    }
-    printMetrics(hbuf, std::stol(sbuf), std::stoi(args.local_port), reflector_packet.sender_tos, 0, payload_len, &reflector_packet);
+    char host[INET_ADDRSTRLEN];
+    uint16_t  port = ntohs(sock->sin_port);
+    inet_ntop(AF_INET, &sock->sin_addr, host, INET_ADDRSTRLEN);
+    printMetrics(host, port, std::stoi(args.local_port), reflector_packet.sender_tos, 0, payload_len, &reflector_packet);
     msghdr message = sender_msg;
+
     struct iovec iov[1];
     iov[0].iov_base=&reflector_packet;
     iov[0].iov_len=payload_len;

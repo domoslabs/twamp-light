@@ -6,6 +6,7 @@
 #include <cstring>
 #include <iostream>
 #include <unistd.h>
+#include <arpa/inet.h>
 #include "Client.h"
 #include "utils.hpp"
 
@@ -108,15 +109,13 @@ bool Client::awaitResponse(size_t payload_len, uint16_t  packet_loss, const Args
 void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msghdr, size_t payload_len, uint16_t packet_loss, const Args& args) {
     IPHeader ipHeader = get_ip_header(msghdr);
     TWAMPTimestamp ts = get_timestamp();
-
-    char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
-    if (getnameinfo((sockaddr *)msghdr.msg_name, msghdr.msg_namelen, hbuf, sizeof(hbuf), sbuf,
-                    sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV) != 0){
-        std::cerr << "Error in getnameinfo" << std::endl;
-    }
-    printMetrics(hbuf, std::stoi(args.local_port), std::stol(sbuf), reflectorPacket->sender_tos, ipHeader.ttl,
-                  ipHeader.tos, &ts,
-                  reflectorPacket, payload_len, packet_loss);
+    sockaddr_in *sock = ((sockaddr_in *)msghdr.msg_name);
+    char host[INET_ADDRSTRLEN];
+    uint16_t  port = ntohs(sock->sin_port);
+    inet_ntop(AF_INET, &sock->sin_addr, host, INET_ADDRSTRLEN);
+    printMetrics(host, std::stoi(args.local_port), port, reflectorPacket->sender_tos, ipHeader.ttl,
+                 ipHeader.tos, &ts,
+                 reflectorPacket, payload_len, packet_loss);
 }
 uint64_t Client::printMetrics(const char *server, uint16_t snd_port, uint16_t rcv_port, uint8_t snd_tos, uint8_t sw_ttl, uint8_t sw_tos,
               TWAMPTimestamp *recv_resp_time, const ReflectorPacket *pack, uint16_t plen, uint16_t packets_lost) {
