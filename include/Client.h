@@ -49,7 +49,7 @@ private:
     struct addrinfo* remote_address_info={};
     struct addrinfo* local_address_info= {};
     TimeSynchronizer* timeSynchronizer = new TimeSynchronizer();
-    SenderPacket craftSenderPacket(int idx);
+    ClientPacket craftSenderPacket(int idx);
 
     void
     handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msghdr, size_t payload_len, uint16_t packet_loss,

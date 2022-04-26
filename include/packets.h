@@ -15,29 +15,31 @@ struct TWAMPTimestamp {
 };
 
 /* Session-Sender TWAMP-Test packet for Unauthenticated mode */
-struct SenderPacket {
+struct ClientPacket {
     uint32_t seq_number;
-    TWAMPTimestamp time;
+    Counter24 timestamp;
+    Counter24 min_delta;
     uint16_t error_estimate;
-    Counter24 sync_timestamp;
     uint8_t padding[TST_PKT_SIZE - 14 - sizeof(Counter24)];
 };
 
 /* Session-Reflector TWAMP-Test packet for Unauthenticated mode */
 struct ReflectorPacket {
     uint32_t seq_number;
-    TWAMPTimestamp time;
     uint16_t error_estimate;
     uint8_t mbz1[2];
-    TWAMPTimestamp receive_time;
+    Counter24 server_timestamp;
+    Counter24 server_min_delta;
+    Counter24 client_timestamp;
+    Counter24 client_min_delta;
     uint32_t sender_seq_number;
-    TWAMPTimestamp sender_time;
+    Counter24 send_timestamp;
+    Counter24 send_delta;
     uint16_t sender_error_estimate;
     uint8_t mbz2[2];
     uint8_t sender_ttl;
     uint8_t sender_tos;
-    Counter24 sync_timestamp;
-    Counter24 sync_min_delta;
-    uint8_t padding[TST_PKT_SIZE - 42 - sizeof(Counter24)*2];
+
+    uint8_t padding[TST_PKT_SIZE - 42];
 };
 #endif //TWAMP_LIGHT_PACKETS_H

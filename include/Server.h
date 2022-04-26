@@ -20,7 +20,7 @@ struct MetricData {
     uint16_t sending_port= 0;
     uint16_t receiving_port = 0;
     uint16_t payload_length = 0;
-    int64_t one_way_delay = 0;
+    int64_t client_server_delay = 0;
     int64_t internal_delay = 0;
     ReflectorPacket packet;
 };
@@ -33,9 +33,9 @@ private:
     bool header_printed = false;
     TimeSynchronizer* timeSynchronizer = new TimeSynchronizer();
     Args args;
-    void handleTestPacket(SenderPacket *packet, msghdr sender_msg, size_t payload_len);
+    void handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t payload_len);
     void printMetrics(const MetricData& data);
-    ReflectorPacket craftReflectorPacket(SenderPacket *sender_packet, msghdr sender_msg);
+    ReflectorPacket craftReflectorPacket(ClientPacket *clientPacket, msghdr sender_msg);
 };
 
 

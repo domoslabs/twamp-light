@@ -41,6 +41,10 @@ Server::Server(const Args& args) {
         std::cerr << strerror(errno) << std::endl;
         std::exit(EXIT_FAILURE);
     }
+    Counter24 ts1 = TimeSynchronizer::LocalTimeToDatagramTS24(100);
+    Counter24 ts2 = TimeSynchronizer::LocalTimeToDatagramTS24(200);
+
+    std::cout << ts1.Value << std::endl;
 }
 
 void Server::listen() {
@@ -53,7 +57,7 @@ void Server::listen() {
                 break;
             }
         }
-        char buffer[sizeof(SenderPacket)]; //We should only be receiving test_packets
+        char buffer[sizeof(ClientPacket)]; //We should only be receiving test_packets
         struct sockaddr src_addr{};
 
         struct iovec iov[1];
@@ -82,32 +86,28 @@ void Server::listen() {
         } else if (message.msg_flags & MSG_TRUNC) {
             std::cout << "Datagram too large for buffer: truncated" << std::endl;
         } else {
-            auto *rec = (SenderPacket *) buffer;
+            auto *rec = (ClientPacket *) buffer;
             handleTestPacket(rec, message, payload_len);
         }
     }
 }
 
-void Server::handleTestPacket(SenderPacket *packet, msghdr sender_msg, size_t payload_len) {
+void Server::handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t payload_len) {
     ReflectorPacket reflector_packet = craftReflectorPacket(packet, sender_msg);
     sockaddr_in *sock = ((sockaddr_in *)sender_msg.msg_name);
     // Overwrite and reuse the sender message with our own data and send it back, instead of creating a new one.
     char* host = inet_ntoa(sock->sin_addr);
     uint16_t  port = ntohs(sock->sin_port);
-
-    /* Compute timestamps in usec */
-    uint64_t t_sender_usec1 = timestamp_to_usec(&reflector_packet.sender_time);
-    uint64_t t_receive_usec1 = timestamp_to_usec(&reflector_packet.receive_time);
-    uint64_t t_reflsender_usec1 = timestamp_to_usec(&reflector_packet.time);
+    timeSynchronizer->OnPeerMinDeltaTS24(packet->min_delta);
+    int64_t client_server_delay = timeSynchronizer->OnAuthenticatedDatagramTimestamp(packet->timestamp, get_usec());
 
     /* Compute delays */
-    int64_t fwd1 = t_receive_usec1-t_sender_usec1;
-    int64_t intd1 = t_reflsender_usec1 - t_receive_usec1;
+    int64_t intd1 = 0;
 
     MetricData data;
     data.payload_length = payload_len;
     data.packet = reflector_packet;
-    data.one_way_delay = fwd1;
+    data.client_server_delay = client_server_delay;
     data.internal_delay = intd1;
     data.receiving_port = std::stoi(args.local_port);
     data.sending_port = port;
@@ -127,21 +127,19 @@ void Server::handleTestPacket(SenderPacket *packet, msghdr sender_msg, size_t pa
     }
 }
 
-ReflectorPacket Server::craftReflectorPacket(SenderPacket *sender_packet, msghdr sender_msg){
+ReflectorPacket Server::craftReflectorPacket(ClientPacket *clientPacket, msghdr sender_msg){
 
     ReflectorPacket packet = {};
-    packet.receive_time = get_timestamp();
-    packet.seq_number = sender_packet->seq_number;
-    packet.sender_seq_number = sender_packet->seq_number;
-    packet.sender_time = sender_packet->time;
-    packet.sender_error_estimate = sender_packet->error_estimate;
+    packet.seq_number = clientPacket->seq_number;
+    packet.sender_seq_number = clientPacket->seq_number;
+    packet.client_timestamp = clientPacket->timestamp;
+    packet.sender_error_estimate = clientPacket->error_estimate;
     IPHeader ipHeader = get_ip_header(sender_msg);
     packet.sender_ttl = ipHeader.ttl;
     packet.sender_tos = ipHeader.tos;
     packet.error_estimate = htons(0x8001);    // Sync = 1, Multiplier = 1 Taken from TWAMP C implementation.
-    packet.sync_timestamp = TimeSynchronizer::LocalTimeToDatagramTS24(get_usec());
-    packet.sync_min_delta = timeSynchronizer->GetMinDeltaTS24();
-    packet.time = get_timestamp();
+    packet.server_timestamp = TimeSynchronizer::LocalTimeToDatagramTS24(get_usec());
+    packet.server_min_delta = timeSynchronizer->GetMinDeltaTS24();
     return packet;
 }
 
@@ -150,13 +148,13 @@ void Server::printMetrics(const MetricData& data) {
 
 
     char sync1 = 'Y';
-    if (data.one_way_delay < 0) {
+    if (data.client_server_delay < 0) {
         sync1 = 'N';
     }
     /* Sequence number */
     uint32_t snd_nb = ntohl(data.packet.sender_seq_number);
     uint32_t rcv_nb = ntohl(data.packet.seq_number);
-    uint64_t t_sender_usec1 = timestamp_to_usec(&data.packet.sender_time);
+    uint64_t t_sender_usec1 = 0;
     /* Sender TOS with ECN from FW TOS */
     uint8_t fw_tos = 0;
     uint8_t snd_tos = data.packet.sender_tos + (fw_tos & 0x3) - (((fw_tos & 0x2) >> 1) & (fw_tos & 0x1));
@@ -166,8 +164,8 @@ void Server::printMetrics(const MetricData& data) {
                   << "SndTOS,"<< "FW_TOS,"<< "IntD,"<< "FWD," << "PLEN" << "\n";
         header_printed = true;
     }
-    std::cout << std::fixed << (double) t_sender_usec1* 1e-3 << "," << data.ip << ","  << snd_nb << ","
-              <<rcv_nb << "," << data.sending_port << "," << data.receiving_port << "," << sync1 << "," << unsigned(data.packet.sender_ttl) << ","<< unsigned(snd_tos) << ","
-              <<unsigned(fw_tos) << "," << (double) data.internal_delay * 1e-3  << ","<< (double) data.one_way_delay * 1e-3 << ","<<std::to_string(data.payload_length) << "\n";
+    std::cout << std::fixed << (double) t_sender_usec1* 1e-3 << "," << data.ip << "," << snd_nb << ","
+              << rcv_nb << "," << data.sending_port << "," << data.receiving_port << "," << sync1 << "," << unsigned(data.packet.sender_ttl) << "," << unsigned(snd_tos) << ","
+              << unsigned(fw_tos) << "," << (double) data.internal_delay * 1e-3 << "," << (double) data.client_server_delay * 1e-3 << "," << std::to_string(data.payload_length) << "\n";
 
 }
