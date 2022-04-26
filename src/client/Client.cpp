@@ -43,6 +43,11 @@ Client::Client(const Args& args) {
         std::cerr << strerror(errno) << std::endl;
         throw;
     }
+    auto val = get_usec();
+    auto ts = TimeSynchronizer::LocalTimeToDatagramTS24(val);
+    auto time = timeSynchronizer->FromLocalTime23(val, ts);
+    std::cout << val << std::endl;
+    std::cout << time << std::endl;
 }
 
 void Client::sendPacket(int idx, size_t payload_len) {
@@ -122,10 +127,10 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msgh
 //    uint64_t t_reflsender_usec = timestamp_to_usec(&reflectorPacket->time);
 //    uint64_t t_recvresp_usec = timestamp_to_usec(&ts);
 
-    uint64_t t_sender_usec = reflectorPacket->client_timestamp.ToUnsigned() << kTime23LostBits;
-    uint64_t t_receive_usec = timeSynchronizer->ToRemoteTime23(reflectorPacket->server_timestamp.ToUnsigned());
-    uint64_t t_reflsender_usec = timeSynchronizer->ToRemoteTime23( reflectorPacket->server_timestamp.ToUnsigned());
-    uint64_t t_recvresp_usec = TimeSynchronizer::LocalTimeToDatagramTS24(get_usec()) << kTime23LostBits;
+    uint64_t t_sender_usec = timeSynchronizer->FromLocalTime23(get_usec(), reflectorPacket->client_timestamp.ToUnsigned());
+    uint64_t t_receive_usec = timeSynchronizer->FromLocalTime23(get_usec(), reflectorPacket->server_timestamp.ToUnsigned());
+    uint64_t t_reflsender_usec = timeSynchronizer->FromLocalTime23(get_usec(), reflectorPacket->send_timestamp.ToUnsigned());
+    uint64_t t_recvresp_usec = get_usec();
 
     /* Compute delays */
     int64_t fwd = t_receive_usec - t_sender_usec;

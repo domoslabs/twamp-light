@@ -140,9 +140,9 @@ ReflectorPacket Server::craftReflectorPacket(ClientPacket *clientPacket, msghdr 
     packet.sender_ttl = ipHeader.ttl;
     packet.sender_tos = ipHeader.tos;
     packet.error_estimate = htons(0x8001);    // Sync = 1, Multiplier = 1 Taken from TWAMP C implementation.
-    packet.server_timestamp = TimeSynchronizer::LocalTimeToDatagramTS24(get_usec());
+    packet.server_timestamp = timeSynchronizer->ToRemoteTime23(get_usec());
     packet.server_min_delta = 0;
-    packet.send_timestamp = TimeSynchronizer::LocalTimeToDatagramTS24(get_usec());
+    packet.send_timestamp = timeSynchronizer->ToRemoteTime23(get_usec());
     return packet;
 }
 
