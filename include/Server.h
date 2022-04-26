@@ -16,14 +16,13 @@ struct Args{
     uint8_t timeout = 10;
 };
 struct MetricData {
-    std::string ip = "";
+    std::string ip;
     uint16_t sending_port= 0;
     uint16_t receiving_port = 0;
     uint16_t payload_length = 0;
     int64_t one_way_delay = 0;
     int64_t internal_delay = 0;
     ReflectorPacket packet;
-
 };
 class Server {
 public:

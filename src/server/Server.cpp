@@ -89,7 +89,6 @@ void Server::listen() {
 }
 
 void Server::handleTestPacket(SenderPacket *packet, msghdr sender_msg, size_t payload_len) {
-    int64_t owd = timeSynchronizer->OnAuthenticatedDatagramTimestamp(packet->sync_timestamp, get_usec());
     ReflectorPacket reflector_packet = craftReflectorPacket(packet, sender_msg);
     sockaddr_in *sock = ((sockaddr_in *)sender_msg.msg_name);
     // Overwrite and reuse the sender message with our own data and send it back, instead of creating a new one.
@@ -97,17 +96,18 @@ void Server::handleTestPacket(SenderPacket *packet, msghdr sender_msg, size_t pa
     uint16_t  port = ntohs(sock->sin_port);
 
     /* Compute timestamps in usec */
+    uint64_t t_sender_usec1 = timestamp_to_usec(&reflector_packet.sender_time);
     uint64_t t_receive_usec1 = timestamp_to_usec(&reflector_packet.receive_time);
     uint64_t t_reflsender_usec1 = timestamp_to_usec(&reflector_packet.time);
 
     /* Compute delays */
-    int64_t fwd1 = owd;
+    int64_t fwd1 = t_receive_usec1-t_sender_usec1;
     int64_t intd1 = t_reflsender_usec1 - t_receive_usec1;
 
     MetricData data;
     data.payload_length = payload_len;
     data.packet = reflector_packet;
-    data.one_way_delay = owd;
+    data.one_way_delay = fwd1;
     data.internal_delay = intd1;
     data.receiving_port = std::stoi(args.local_port);
     data.sending_port = port;

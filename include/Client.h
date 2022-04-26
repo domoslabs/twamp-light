@@ -24,6 +24,19 @@ struct Args {
     uint8_t max_retries = 10;
     uint32_t seed = 0;
 };
+struct MetricData {
+    std::string ip;
+    uint16_t sending_port= 0;
+    uint16_t receiving_port = 0;
+    uint16_t payload_length = 0;
+    int64_t client_server_delay = 0;
+    int64_t server_client_delay = 0;
+    int64_t internal_delay = 0;
+    int64_t rtt_delay = 0;
+    uint16_t packet_loss = 0;
+    ReflectorPacket packet;
+    IPHeader  ipHeader;
+};
 class Client {
 public:
     Client(const Args& args);
@@ -42,10 +55,8 @@ private:
     handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msghdr, size_t payload_len, uint16_t packet_loss,
                           const Args &args);
 
-    uint64_t
-    printMetrics(const char *server, uint16_t snd_port, uint16_t rcv_port, uint8_t snd_tos, uint8_t sw_ttl,
-                 uint8_t sw_tos,
-                 TWAMPTimestamp *recv_resp_time, const ReflectorPacket *pack, uint16_t plen, uint16_t packets_lost);
+    void
+    printMetrics(const MetricData& data);
 };
 
 

@@ -110,36 +110,48 @@ bool Client::awaitResponse(size_t payload_len, uint16_t  packet_loss, const Args
 void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msghdr, size_t payload_len, uint16_t packet_loss, const Args& args) {
     IPHeader ipHeader = get_ip_header(msghdr);
     TWAMPTimestamp ts = get_timestamp();
-    timeSynchronizer->OnAuthenticatedDatagramTimestamp(reflectorPacket->sync_timestamp, get_usec());
     timeSynchronizer->OnPeerMinDeltaTS24(reflectorPacket->sync_min_delta);
+    int64_t owd = timeSynchronizer->OnAuthenticatedDatagramTimestamp(reflectorPacket->sync_timestamp, get_usec());
     sockaddr_in *sock = ((sockaddr_in *)msghdr.msg_name);
     char* host = inet_ntoa(sock->sin_addr);
     uint16_t  port = ntohs(sock->sin_port);
-    printMetrics(host, std::stoi(args.local_port), port, reflectorPacket->sender_tos, ipHeader.ttl,
-                 ipHeader.tos, &ts,
-                 reflectorPacket, payload_len, packet_loss);
-}
-uint64_t Client::printMetrics(const char *server, uint16_t snd_port, uint16_t rcv_port, uint8_t snd_tos, uint8_t sw_ttl, uint8_t sw_tos,
-              TWAMPTimestamp *recv_resp_time, const ReflectorPacket *pack, uint16_t plen, uint16_t packets_lost) {
+
     /* Compute timestamps in usec */
-    uint64_t t_sender_usec = timestamp_to_usec(&pack->sender_time);
-    uint64_t t_receive_usec = timestamp_to_usec(&pack->receive_time);
-    uint64_t t_reflsender_usec = timestamp_to_usec(&pack->time);
-    uint64_t t_recvresp_usec = timestamp_to_usec(recv_resp_time);
+    uint64_t t_sender_usec = timestamp_to_usec(&reflectorPacket->sender_time);
+    uint64_t t_receive_usec = timestamp_to_usec(&reflectorPacket->receive_time);
+    uint64_t t_reflsender_usec = timestamp_to_usec(&reflectorPacket->time);
+    uint64_t t_recvresp_usec = timestamp_to_usec(&ts);
 
     /* Compute delays */
     int64_t fwd = t_receive_usec - t_sender_usec;
-    int64_t swd = t_recvresp_usec - t_reflsender_usec;
+    int64_t swd = owd;
     int64_t intd = t_reflsender_usec - t_receive_usec;
     int64_t rtt = t_recvresp_usec - t_sender_usec;
+
+    MetricData data;
+    data.ip = host;
+    data.sending_port = std::stoi(args.local_port);
+    data.receiving_port = port;
+    data.packet = *reflectorPacket;
+    data.ipHeader = ipHeader;
+    data.payload_length = payload_len;
+    data.packet_loss = packet_loss;
+    data.internal_delay = intd;
+    data.server_client_delay = owd;
+    data.client_server_delay = fwd;
+    data.rtt_delay = rtt;
+
+    printMetrics(data);
+}
+void Client::printMetrics(const MetricData& data) {
     char sync = 'Y';
-    if ((fwd < 0) || (swd < 0)) {
+    if ((data.client_server_delay < 0) || (data.server_client_delay < 0)) {
         sync = 'N';
     }
-
+    uint64_t t_sender_usec = timestamp_to_usec(&data.packet.sender_time);
     /*Sequence number */
-    uint32_t rcv_sn = ntohl(pack->seq_number);
-    uint32_t snd_sn = ntohl(pack->sender_seq_number);
+    uint32_t rcv_sn = ntohl(data.packet.seq_number);
+    uint32_t snd_sn = ntohl(data.packet.sender_seq_number);
 
     if(!header_printed){
         std::cout << "Time,"<< "IP,"<< "Snd#,"<< "Rcv#,"<< "SndPort,"<< "RscPort,"<< "Sync,"<< "FW_TTL,"
@@ -147,11 +159,10 @@ uint64_t Client::printMetrics(const char *server, uint16_t snd_port, uint16_t rc
                   << "FWD,"<< "BWD,"<< "PLEN," << "LOSS" << "\n";
         header_printed = true;
     }
-    std::cout << std::fixed << (double) t_sender_usec * 1e-3 << "," << server<< ","<< snd_sn<< ","<< rcv_sn<< ","<< snd_port<< ","
-              << rcv_port<< ","<< sync<< ","<< unsigned(pack->sender_ttl)<< ","<< unsigned(sw_ttl)<< ","
-              << unsigned(snd_tos)<< ","<< '-'<< ","<< unsigned(sw_tos)<< ","<<(double) rtt * 1e-3<< ","
-              <<(double) intd* 1e-3<< ","<< (double) fwd * 1e-3<< ","<< (double) swd * 1e-3<< ","<< plen<< "," << packets_lost << "\n";
+    std::cout << std::fixed << (double) t_sender_usec * 1e-3 << "," << data.ip<< ","<< snd_sn<< ","<< rcv_sn<< ","<< data.sending_port<< ","
+              << data.receiving_port<< ","<< sync<< ","<< unsigned(data.packet.sender_ttl)<< ","<< unsigned(data.ipHeader.ttl)<< ","
+              << unsigned(data.packet.sender_tos)<< ","<< '-'<< ","<< unsigned(data.ipHeader.tos)<< ","<<(double) data.rtt_delay * 1e-3<< ","
+              <<(double) data.internal_delay* 1e-3<< ","<< (double) data.client_server_delay * 1e-3<< ","<< (double) data.server_client_delay * 1e-3<< ","<< data.payload_length<< "," << data.packet_loss << "\n";
 
-    return t_recvresp_usec - t_sender_usec;
 
 }
