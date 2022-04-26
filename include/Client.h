@@ -34,6 +34,7 @@ struct MetricData {
     int64_t internal_delay = 0;
     int64_t rtt_delay = 0;
     uint16_t packet_loss = 0;
+    uint64_t initial_send_time = 0;
     ReflectorPacket packet;
     IPHeader  ipHeader;
 };

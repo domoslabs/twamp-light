@@ -115,7 +115,7 @@ bool Client::awaitResponse(size_t payload_len, uint16_t  packet_loss, const Args
 void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msghdr, size_t payload_len, uint16_t packet_loss, const Args& args) {
     IPHeader ipHeader = get_ip_header(msghdr);
     TWAMPTimestamp ts = get_timestamp();
-    //timeSynchronizer->OnPeerMinDeltaTS24(reflectorPacket->server_min_delta);
+    timeSynchronizer->OnPeerMinDeltaTS24(reflectorPacket->server_min_delta);
     int64_t server_client_delay = timeSynchronizer->OnAuthenticatedDatagramTimestamp(reflectorPacket->server_timestamp, get_usec());
     sockaddr_in *sock = ((sockaddr_in *)msghdr.msg_name);
     char* host = inet_ntoa(sock->sin_addr);
@@ -145,6 +145,7 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msgh
     data.receiving_port = port;
     data.packet = *reflectorPacket;
     data.ipHeader = ipHeader;
+    data.initial_send_time = t_sender_usec;
     data.payload_length = payload_len;
     data.packet_loss = packet_loss;
     data.internal_delay = intd;
@@ -159,7 +160,6 @@ void Client::printMetrics(const MetricData& data) {
     if ((data.client_server_delay < 0) || (data.server_client_delay < 0)) {
         sync = 'N';
     }
-    uint64_t t_sender_usec = 0;
     /*Sequence number */
     uint32_t rcv_sn = ntohl(data.packet.seq_number);
     uint32_t snd_sn = ntohl(data.packet.sender_seq_number);
@@ -170,7 +170,7 @@ void Client::printMetrics(const MetricData& data) {
                   << "FWD,"<< "BWD,"<< "PLEN," << "LOSS" << "\n";
         header_printed = true;
     }
-    std::cout << std::fixed << (double) t_sender_usec * 1e-3 << "," << data.ip<< ","<< snd_sn<< ","<< rcv_sn<< ","<< data.sending_port<< ","
+    std::cout << std::fixed << (double) data.initial_send_time * 1e-3 << "," << data.ip<< ","<< snd_sn<< ","<< rcv_sn<< ","<< data.sending_port<< ","
               << data.receiving_port<< ","<< sync<< ","<< unsigned(data.packet.sender_ttl)<< ","<< unsigned(data.ipHeader.ttl)<< ","
               << unsigned(data.packet.sender_tos)<< ","<< '-'<< ","<< unsigned(data.ipHeader.tos)<< ","<<(double) data.rtt_delay * 1e-3<< ","
               <<(double) data.internal_delay* 1e-3<< ","<< (double) data.client_server_delay * 1e-3<< ","<< (double) data.server_client_delay * 1e-3<< ","<< data.payload_length<< "," << data.packet_loss << "\n";
