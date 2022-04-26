@@ -125,10 +125,10 @@ uint64_t Client::printMetrics(const char *server, uint16_t snd_port, uint16_t rc
     uint64_t t_recvresp_usec = get_usec(recv_resp_time);
 
     /* Compute delays */
-    uint64_t fwd = t_receive_usec - t_sender_usec;
-    uint64_t swd = t_recvresp_usec - t_reflsender_usec;
-    uint64_t intd = t_reflsender_usec - t_receive_usec;
-    uint64_t rtt = t_recvresp_usec - t_sender_usec;
+    int64_t fwd = t_receive_usec - t_sender_usec;
+    int64_t swd = t_recvresp_usec - t_reflsender_usec;
+    int64_t intd = t_reflsender_usec - t_receive_usec;
+    int64_t rtt = t_recvresp_usec - t_sender_usec;
     char sync = 'Y';
     if ((fwd < 0) || (swd < 0)) {
         sync = 'N';

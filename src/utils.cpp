@@ -57,10 +57,10 @@ TWAMPTimestamp get_timestamp() {
     return ts;
 }
 
-int64_t get_usec(const TWAMPTimestamp *ts) {
+uint64_t get_usec(const TWAMPTimestamp *ts) {
     struct timeval tv;
     timestamp_to_timeval(ts, &tv);
-    return (int64_t) tv.tv_sec * 1000000 + (int64_t) tv.tv_usec;
+    return (uint64_t) tv.tv_sec * 1000000 + (uint64_t) tv.tv_usec;
 }
 /**
  * Session-Reflector implementations SHOULD fetch
