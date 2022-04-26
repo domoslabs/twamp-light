@@ -45,13 +45,12 @@ Server::Server(const Args& args) {
 
 void Server::listen() {
     // Read incoming datagrams
-    bool run = true;
     int counter = 0;
-    while(run){
+    while(true){
         if(args.num_samples != 0){
             counter++;
             if(counter > args.num_samples){
-                run = false;
+                break;
             }
         }
         char buffer[sizeof(SenderPacket)]; //We should only be receiving test_packets
