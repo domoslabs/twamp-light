@@ -120,10 +120,10 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msgh
 //    uint64_t t_receive_usec = timestamp_to_usec(&reflectorPacket->receive_time);
 //    uint64_t t_reflsender_usec = timestamp_to_usec(&reflectorPacket->time);
 //    uint64_t t_recvresp_usec = timestamp_to_usec(&ts);
-    uint64_t t_sender_usec = 0;
-    uint64_t t_receive_usec = 0;
-    uint64_t t_reflsender_usec = 0;
-    uint64_t t_recvresp_usec = 0;
+    uint64_t t_sender_usec = reflectorPacket->client_timestamp.ToUnsigned() << kTime23LostBits;
+    uint64_t t_receive_usec = reflectorPacket->server_timestamp.ToUnsigned() << kTime23LostBits;
+    uint64_t t_reflsender_usec = reflectorPacket->send_timestamp.ToUnsigned() << kTime23LostBits;
+    uint64_t t_recvresp_usec = get_usec();
 
     /* Compute delays */
     int64_t fwd = t_receive_usec - t_sender_usec;

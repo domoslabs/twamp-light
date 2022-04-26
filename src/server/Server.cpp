@@ -41,10 +41,11 @@ Server::Server(const Args& args) {
         std::cerr << strerror(errno) << std::endl;
         std::exit(EXIT_FAILURE);
     }
-    Counter24 ts1 = TimeSynchronizer::LocalTimeToDatagramTS24(100);
-    Counter24 ts2 = TimeSynchronizer::LocalTimeToDatagramTS24(200);
+    Counter24 ts1 = TimeSynchronizer::LocalTimeToDatagramTS24(1000);
+    Counter24 ts2 = TimeSynchronizer::LocalTimeToDatagramTS24(2500);
 
-    std::cout << ts1.Value << std::endl;
+    std::cout << (ts1.ToUnsigned()<< kTime23LostBits) << std::endl;
+    std::cout << (ts2.ToUnsigned()<< kTime23LostBits) << std::endl;
 }
 
 void Server::listen() {
