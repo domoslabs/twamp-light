@@ -41,11 +41,6 @@ Server::Server(const Args& args) {
         std::cerr << strerror(errno) << std::endl;
         std::exit(EXIT_FAILURE);
     }
-    Counter24 ts1 = TimeSynchronizer::LocalTimeToDatagramTS24(1000);
-    Counter24 ts2 = TimeSynchronizer::LocalTimeToDatagramTS24(2500);
-
-    std::cout << (ts1.ToUnsigned()<< kTime23LostBits) << std::endl;
-    std::cout << (ts2.ToUnsigned()<< kTime23LostBits) << std::endl;
 }
 
 void Server::listen() {
@@ -101,9 +96,12 @@ void Server::handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t pa
     uint16_t  port = ntohs(sock->sin_port);
     timeSynchronizer->OnPeerMinDeltaTS24(packet->min_delta);
     int64_t client_server_delay = timeSynchronizer->OnAuthenticatedDatagramTimestamp(packet->timestamp, get_usec());
+    /* Compute timestamps in usec */
+    uint64_t t_receive_usec1 = reflector_packet.server_timestamp.ToUnsigned() << kTime23LostBits;
+    uint64_t t_reflsender_usec1 = reflector_packet.send_timestamp.ToUnsigned() << kTime23LostBits;
 
     /* Compute delays */
-    int64_t intd1 = 0;
+    int64_t intd1 = t_reflsender_usec1 - t_receive_usec1;
 
     MetricData data;
     data.payload_length = payload_len;
@@ -134,6 +132,7 @@ ReflectorPacket Server::craftReflectorPacket(ClientPacket *clientPacket, msghdr 
     packet.seq_number = clientPacket->seq_number;
     packet.sender_seq_number = clientPacket->seq_number;
     packet.client_timestamp = clientPacket->timestamp;
+    packet.client_min_delta = clientPacket->min_delta;
     packet.sender_error_estimate = clientPacket->error_estimate;
     IPHeader ipHeader = get_ip_header(sender_msg);
     packet.sender_ttl = ipHeader.ttl;
@@ -141,6 +140,7 @@ ReflectorPacket Server::craftReflectorPacket(ClientPacket *clientPacket, msghdr 
     packet.error_estimate = htons(0x8001);    // Sync = 1, Multiplier = 1 Taken from TWAMP C implementation.
     packet.server_timestamp = TimeSynchronizer::LocalTimeToDatagramTS24(get_usec());
     packet.server_min_delta = timeSynchronizer->GetMinDeltaTS24();
+    packet.send_timestamp = TimeSynchronizer::LocalTimeToDatagramTS24(get_usec());
     return packet;
 }
 
@@ -155,7 +155,7 @@ void Server::printMetrics(const MetricData& data) {
     /* Sequence number */
     uint32_t snd_nb = ntohl(data.packet.sender_seq_number);
     uint32_t rcv_nb = ntohl(data.packet.seq_number);
-    uint64_t t_sender_usec1 = 0;
+    uint64_t t_sender_usec1 = data.packet.client_timestamp.ToUnsigned() << kTime23LostBits;
     /* Sender TOS with ECN from FW TOS */
     uint8_t fw_tos = 0;
     uint8_t snd_tos = data.packet.sender_tos + (fw_tos & 0x3) - (((fw_tos & 0x2) >> 1) & (fw_tos & 0x1));
