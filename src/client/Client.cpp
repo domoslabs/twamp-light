@@ -115,7 +115,7 @@ bool Client::awaitResponse(size_t payload_len, uint16_t  packet_loss, const Args
 void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msghdr, size_t payload_len, uint16_t packet_loss, const Args& args) {
     IPHeader ipHeader = get_ip_header(msghdr);
     TWAMPTimestamp ts = get_timestamp();
-    timeSynchronizer->OnPeerMinDeltaTS24(reflectorPacket->server_min_delta);
+    //timeSynchronizer->OnPeerMinDeltaTS24(reflectorPacket->server_min_delta);
     int64_t server_client_delay = timeSynchronizer->OnAuthenticatedDatagramTimestamp(reflectorPacket->server_timestamp, get_usec());
     sockaddr_in *sock = ((sockaddr_in *)msghdr.msg_name);
     char* host = inet_ntoa(sock->sin_addr);

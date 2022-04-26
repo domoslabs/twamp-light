@@ -94,9 +94,9 @@ void Server::handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t pa
     // Overwrite and reuse the sender message with our own data and send it back, instead of creating a new one.
     char* host = inet_ntoa(sock->sin_addr);
     uint16_t  port = ntohs(sock->sin_port);
-
-    int64_t client_server_delay = timeSynchronizer->OnAuthenticatedDatagramTimestamp(packet->timestamp, get_usec());
     timeSynchronizer->OnPeerMinDeltaTS24(packet->min_delta);
+    int64_t client_server_delay = timeSynchronizer->OnAuthenticatedDatagramTimestamp(packet->timestamp, get_usec());
+
 
     /* Compute timestamps in usec */
     uint64_t t_receive_usec1 = reflector_packet.server_timestamp.ToUnsigned() << kTime23LostBits;
@@ -141,7 +141,7 @@ ReflectorPacket Server::craftReflectorPacket(ClientPacket *clientPacket, msghdr 
     packet.sender_tos = ipHeader.tos;
     packet.error_estimate = htons(0x8001);    // Sync = 1, Multiplier = 1 Taken from TWAMP C implementation.
     packet.server_timestamp = timeSynchronizer->ToRemoteTime23(get_usec());
-    packet.server_min_delta = 0;
+    packet.server_min_delta = timeSynchronizer->GetMinDeltaTS24();
     packet.send_timestamp = timeSynchronizer->ToRemoteTime23(get_usec());
     return packet;
 }
@@ -157,7 +157,7 @@ void Server::printMetrics(const MetricData& data) {
     /* Sequence number */
     uint32_t snd_nb = ntohl(data.packet.sender_seq_number);
     uint32_t rcv_nb = ntohl(data.packet.seq_number);
-    uint64_t t_sender_usec1 = data.packet.client_timestamp.ToUnsigned() << kTime23LostBits;
+    uint64_t t_sender_usec1 = timeSynchronizer->FromLocalTime23(get_usec(), data.packet.client_timestamp.ToUnsigned());
     /* Sender TOS with ECN from FW TOS */
     uint8_t fw_tos = 0;
     uint8_t snd_tos = data.packet.sender_tos + (fw_tos & 0x3) - (((fw_tos & 0x2) >> 1) & (fw_tos & 0x1));
