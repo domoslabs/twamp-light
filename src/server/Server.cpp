@@ -94,8 +94,10 @@ void Server::handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t pa
     // Overwrite and reuse the sender message with our own data and send it back, instead of creating a new one.
     char* host = inet_ntoa(sock->sin_addr);
     uint16_t  port = ntohs(sock->sin_port);
-    timeSynchronizer->OnPeerMinDeltaTS24(packet->min_delta);
+
     int64_t client_server_delay = timeSynchronizer->OnAuthenticatedDatagramTimestamp(packet->timestamp, get_usec());
+    timeSynchronizer->OnPeerMinDeltaTS24(packet->min_delta);
+
     /* Compute timestamps in usec */
     uint64_t t_receive_usec1 = reflector_packet.server_timestamp.ToUnsigned() << kTime23LostBits;
     uint64_t t_reflsender_usec1 = reflector_packet.send_timestamp.ToUnsigned() << kTime23LostBits;
@@ -132,15 +134,15 @@ ReflectorPacket Server::craftReflectorPacket(ClientPacket *clientPacket, msghdr 
     packet.seq_number = clientPacket->seq_number;
     packet.sender_seq_number = clientPacket->seq_number;
     packet.client_timestamp = clientPacket->timestamp;
-    packet.client_min_delta = clientPacket->min_delta;
+    packet.client_min_delta = 0;
     packet.sender_error_estimate = clientPacket->error_estimate;
     IPHeader ipHeader = get_ip_header(sender_msg);
     packet.sender_ttl = ipHeader.ttl;
     packet.sender_tos = ipHeader.tos;
     packet.error_estimate = htons(0x8001);    // Sync = 1, Multiplier = 1 Taken from TWAMP C implementation.
-    packet.server_timestamp = timeSynchronizer->ToRemoteTime23(get_usec());
-    packet.server_min_delta = timeSynchronizer->GetMinDeltaTS24();
-    packet.send_timestamp = timeSynchronizer->ToRemoteTime23(get_usec());
+    packet.server_timestamp = TimeSynchronizer::LocalTimeToDatagramTS24(get_usec());
+    packet.server_min_delta = 0;
+    packet.send_timestamp = TimeSynchronizer::LocalTimeToDatagramTS24(get_usec());
     return packet;
 }
 

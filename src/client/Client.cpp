@@ -69,7 +69,7 @@ ClientPacket Client::craftSenderPacket(int idx){
     ClientPacket packet = {};
     packet.seq_number = htonl(idx);
     packet.error_estimate = htons(0x8001); // Sync = 1, Multiplier = 1.
-    packet.timestamp = timeSynchronizer->ToRemoteTime23(get_usec());
+    packet.timestamp = TimeSynchronizer::LocalTimeToDatagramTS24(get_usec());
     packet.min_delta = timeSynchronizer->GetMinDeltaTS24();
     return packet;
 }
@@ -123,8 +123,8 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msgh
 //    uint64_t t_recvresp_usec = timestamp_to_usec(&ts);
 
     uint64_t t_sender_usec = reflectorPacket->client_timestamp.ToUnsigned() << kTime23LostBits;
-    uint64_t t_receive_usec = timeSynchronizer->FromLocalTime23(get_usec(), reflectorPacket->server_timestamp.ToUnsigned());
-    uint64_t t_reflsender_usec = timeSynchronizer->FromLocalTime23(get_usec(), reflectorPacket->server_timestamp.ToUnsigned());
+    uint64_t t_receive_usec = timeSynchronizer->ToRemoteTime23(reflectorPacket->server_timestamp.ToUnsigned());
+    uint64_t t_reflsender_usec = timeSynchronizer->ToRemoteTime23( reflectorPacket->server_timestamp.ToUnsigned());
     uint64_t t_recvresp_usec = TimeSynchronizer::LocalTimeToDatagramTS24(get_usec()) << kTime23LostBits;
 
     /* Compute delays */
