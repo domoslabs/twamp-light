@@ -6,7 +6,7 @@ set(
         include/utils.hpp
         include/CLI11.hpp
         src/utils.cpp
-        include/packets.h)
+        include/packets.h src/TimeSync.cpp include/TimeSync.h)
 set(
         CLIENT_TARGET
         twamp-light-client
@@ -19,7 +19,7 @@ set(
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-add_executable(${CLIENT_TARGET} src/client/Client.cpp include/Client.h src/client/main_client.cpp ${COMMON_SOURCES} )
+add_executable(${CLIENT_TARGET} src/client/Client.cpp include/Client.h src/client/main_client.cpp ${COMMON_SOURCES} include/Counter.h)
 add_executable(${SERVER_TARGET} src/server/Server.cpp include/Server.h src/server/main_server.cpp ${COMMON_SOURCES})
 
 install(TARGETS twamp-light-client twamp-light-server)

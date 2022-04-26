@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include "utils.hpp"
+#include "TimeSync.h"
 
 struct Args {
     std::string remote_host;
@@ -34,6 +35,7 @@ private:
     bool header_printed = false;
     struct addrinfo* remote_address_info={};
     struct addrinfo* local_address_info= {};
+    TimeSynchronizer* timeSynchronizer = new TimeSynchronizer();
     SenderPacket craftSenderPacket(int idx);
 
     void

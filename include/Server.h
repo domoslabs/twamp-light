@@ -7,6 +7,7 @@
 
 #include <string>
 #include "utils.hpp"
+#include "TimeSync.h"
 
 struct Args{
     std::string local_host;
@@ -21,6 +22,7 @@ public:
 private:
     int fd;
     bool header_printed = false;
+    TimeSynchronizer* timeSynchronizer = new TimeSynchronizer();
     Args args;
     void handleTestPacket(SenderPacket *packet, msghdr sender_msg, size_t payload_len);
     void printMetrics(const char *addr_cl, uint16_t snd_port, uint16_t rcv_port, uint8_t snd_tos, uint8_t fw_tos, uint16_t plen, const ReflectorPacket *pack);

@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 #include "Server.h"
 #include "utils.hpp"
+#include "TimeSync.h"
 
 Server::Server(const Args& args) {
     this->args = args;

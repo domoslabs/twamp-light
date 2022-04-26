@@ -29,7 +29,7 @@ void timeval_to_timestamp(const struct timeval *tv, TWAMPTimestamp * ts);
 
 void timestamp_to_timeval(const TWAMPTimestamp * ts, struct timeval *tv);
 
-uint64_t get_usec(const TWAMPTimestamp * ts);
+int64_t get_usec(const TWAMPTimestamp * ts);
 
 TWAMPTimestamp get_timestamp();
 
