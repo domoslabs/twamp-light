@@ -70,6 +70,7 @@ SenderPacket Client::craftSenderPacket(int idx){
     packet.seq_number = htonl(idx);
     packet.time = get_timestamp();
     packet.error_estimate = htons(0x8001); // Sync = 1, Multiplier = 1.
+    packet.sync_timestamp = TimeSynchronizer::LocalTimeToDatagramTS24(get_usec());
     return packet;
 }
 
@@ -109,6 +110,8 @@ bool Client::awaitResponse(size_t payload_len, uint16_t  packet_loss, const Args
 void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msghdr, size_t payload_len, uint16_t packet_loss, const Args& args) {
     IPHeader ipHeader = get_ip_header(msghdr);
     TWAMPTimestamp ts = get_timestamp();
+    timeSynchronizer->OnAuthenticatedDatagramTimestamp(reflectorPacket->sync_timestamp, get_usec());
+    timeSynchronizer->OnPeerMinDeltaTS24(reflectorPacket->sync_min_delta);
     sockaddr_in *sock = ((sockaddr_in *)msghdr.msg_name);
     char* host = inet_ntoa(sock->sin_addr);
     uint16_t  port = ntohs(sock->sin_port);
@@ -119,10 +122,10 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msgh
 uint64_t Client::printMetrics(const char *server, uint16_t snd_port, uint16_t rcv_port, uint8_t snd_tos, uint8_t sw_ttl, uint8_t sw_tos,
               TWAMPTimestamp *recv_resp_time, const ReflectorPacket *pack, uint16_t plen, uint16_t packets_lost) {
     /* Compute timestamps in usec */
-    uint64_t t_sender_usec = get_usec(&pack->sender_time);
-    uint64_t t_receive_usec = get_usec(&pack->receive_time);
-    uint64_t t_reflsender_usec = get_usec(&pack->time);
-    uint64_t t_recvresp_usec = get_usec(recv_resp_time);
+    uint64_t t_sender_usec = timestamp_to_usec(&pack->sender_time);
+    uint64_t t_receive_usec = timestamp_to_usec(&pack->receive_time);
+    uint64_t t_reflsender_usec = timestamp_to_usec(&pack->time);
+    uint64_t t_recvresp_usec = timestamp_to_usec(recv_resp_time);
 
     /* Compute delays */
     int64_t fwd = t_receive_usec - t_sender_usec;

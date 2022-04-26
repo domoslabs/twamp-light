@@ -15,6 +15,16 @@ struct Args{
     uint32_t num_samples = 0;
     uint8_t timeout = 10;
 };
+struct MetricData {
+    std::string ip = "";
+    uint16_t sending_port= 0;
+    uint16_t receiving_port = 0;
+    uint16_t payload_length = 0;
+    int64_t one_way_delay = 0;
+    int64_t internal_delay = 0;
+    ReflectorPacket packet;
+
+};
 class Server {
 public:
     Server(const Args& args);
@@ -25,7 +35,7 @@ private:
     TimeSynchronizer* timeSynchronizer = new TimeSynchronizer();
     Args args;
     void handleTestPacket(SenderPacket *packet, msghdr sender_msg, size_t payload_len);
-    void printMetrics(const char *addr_cl, uint16_t snd_port, uint16_t rcv_port, uint8_t snd_tos, uint8_t fw_tos, uint16_t plen, const ReflectorPacket *pack);
+    void printMetrics(const MetricData& data);
     ReflectorPacket craftReflectorPacket(SenderPacket *sender_packet, msghdr sender_msg);
 };
 

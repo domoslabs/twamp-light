@@ -89,12 +89,30 @@ void Server::listen() {
 }
 
 void Server::handleTestPacket(SenderPacket *packet, msghdr sender_msg, size_t payload_len) {
+    int64_t owd = timeSynchronizer->OnAuthenticatedDatagramTimestamp(packet->sync_timestamp, get_usec());
     ReflectorPacket reflector_packet = craftReflectorPacket(packet, sender_msg);
     sockaddr_in *sock = ((sockaddr_in *)sender_msg.msg_name);
     // Overwrite and reuse the sender message with our own data and send it back, instead of creating a new one.
     char* host = inet_ntoa(sock->sin_addr);
     uint16_t  port = ntohs(sock->sin_port);
-    printMetrics(host, port, std::stoi(args.local_port), reflector_packet.sender_tos, 0, payload_len, &reflector_packet);
+
+    /* Compute timestamps in usec */
+    uint64_t t_receive_usec1 = timestamp_to_usec(&reflector_packet.receive_time);
+    uint64_t t_reflsender_usec1 = timestamp_to_usec(&reflector_packet.time);
+
+    /* Compute delays */
+    int64_t fwd1 = owd;
+    int64_t intd1 = t_reflsender_usec1 - t_receive_usec1;
+
+    MetricData data;
+    data.payload_length = payload_len;
+    data.packet = reflector_packet;
+    data.one_way_delay = owd;
+    data.internal_delay = intd1;
+    data.receiving_port = std::stoi(args.local_port);
+    data.sending_port = port;
+    data.ip = host;
+    printMetrics(data);
     msghdr message = sender_msg;
 
     struct iovec iov[1];
@@ -121,42 +139,35 @@ ReflectorPacket Server::craftReflectorPacket(SenderPacket *sender_packet, msghdr
     packet.sender_ttl = ipHeader.ttl;
     packet.sender_tos = ipHeader.tos;
     packet.error_estimate = htons(0x8001);    // Sync = 1, Multiplier = 1 Taken from TWAMP C implementation.
+    packet.sync_timestamp = TimeSynchronizer::LocalTimeToDatagramTS24(get_usec());
+    packet.sync_min_delta = timeSynchronizer->GetMinDeltaTS24();
     packet.time = get_timestamp();
     return packet;
 }
 
 
-void Server::printMetrics(const char *addr_cl, uint16_t snd_port, uint16_t rcv_port,
-                          uint8_t snd_tos, uint8_t fw_tos, uint16_t plen,
-                          const ReflectorPacket *pack) {
+void Server::printMetrics(const MetricData& data) {
 
-    /* Compute timestamps in usec */
-    uint64_t t_sender_usec1 = get_usec(&pack->sender_time);
-    uint64_t t_receive_usec1 = get_usec(&pack->receive_time);
-    uint64_t t_reflsender_usec1 = get_usec(&pack->time);
 
-    /* Compute delays */
-    int64_t fwd1 = t_receive_usec1 - t_sender_usec1;
-    int64_t intd1 = t_reflsender_usec1 - t_receive_usec1;
     char sync1 = 'Y';
-    if (fwd1 < 0) {
+    if (data.one_way_delay < 0) {
         sync1 = 'N';
     }
     /* Sequence number */
-    uint32_t snd_nb = ntohl(pack->sender_seq_number);
-    uint32_t rcv_nb = ntohl(pack->seq_number);
-
+    uint32_t snd_nb = ntohl(data.packet.sender_seq_number);
+    uint32_t rcv_nb = ntohl(data.packet.seq_number);
+    uint64_t t_sender_usec1 = timestamp_to_usec(&data.packet.sender_time);
     /* Sender TOS with ECN from FW TOS */
-    snd_tos =
-            snd_tos + (fw_tos & 0x3) - (((fw_tos & 0x2) >> 1) & (fw_tos & 0x1));
+    uint8_t fw_tos = 0;
+    uint8_t snd_tos = data.packet.sender_tos + (fw_tos & 0x3) - (((fw_tos & 0x2) >> 1) & (fw_tos & 0x1));
     if(!header_printed){
 
         std::cout << "Time," << "IP,"<< "Snd#,"<< "Rcv#,"<< "SndPort,"<< "RscPort,"<< "Sync,"<< "FW_TTL,"
                   << "SndTOS,"<< "FW_TOS,"<< "IntD,"<< "FWD," << "PLEN" << "\n";
         header_printed = true;
     }
-    std::cout << std::fixed << (double) t_sender_usec1* 1e-3 << "," << addr_cl << ","  << snd_nb << ","
-              <<rcv_nb << "," << snd_port << "," << rcv_port << "," << sync1 << "," << unsigned(pack->sender_ttl) << ","<< unsigned(snd_tos) << ","
-              <<unsigned(fw_tos) << "," << (double) intd1 * 1e-3  << ","<< (double) fwd1 * 1e-3 << ","<<std::to_string(plen) << "\n";
+    std::cout << std::fixed << (double) t_sender_usec1* 1e-3 << "," << data.ip << ","  << snd_nb << ","
+              <<rcv_nb << "," << data.sending_port << "," << data.receiving_port << "," << sync1 << "," << unsigned(data.packet.sender_ttl) << ","<< unsigned(snd_tos) << ","
+              <<unsigned(fw_tos) << "," << (double) data.internal_delay * 1e-3  << ","<< (double) data.one_way_delay * 1e-3 << ","<<std::to_string(data.payload_length) << "\n";
 
 }
