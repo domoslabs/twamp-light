@@ -111,9 +111,9 @@ void Server::handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t pa
         server_receive_time = timeSynchronizer->FromLocalTime23(get_usec(), server_timestamp);
         server_send_time = timeSynchronizer->FromLocalTime23(get_usec(), send_timestamp);
     } else {
-        TWAMPTimestamp client_timestamp = packet->send_time_data;
-        TWAMPTimestamp server_timestamp = reflector_packet.server_time_data;
-        TWAMPTimestamp send_timestamp = reflector_packet.send_time_data;
+        Timestamp client_timestamp = packet->send_time_data;
+        Timestamp server_timestamp = reflector_packet.server_time_data;
+        Timestamp send_timestamp = reflector_packet.send_time_data;
         client_server_delay = (int64_t)(timestamp_to_usec(&server_timestamp)-timestamp_to_usec(&client_timestamp));
         server_receive_time = timestamp_to_usec(&server_timestamp);
         server_send_time = timestamp_to_usec(&send_timestamp);
@@ -154,12 +154,12 @@ ReflectorPacket Server::craftReflectorPacket(ClientPacket *clientPacket, msghdr 
 
     ReflectorPacket packet = {};
     if(args.sync_time){
-        TWAMPTimestamp server_timestamp = {};
+        Timestamp server_timestamp = {};
         server_timestamp.integer = TimeSynchronizer::LocalTimeToDatagramTS24(get_usec());
         server_timestamp.fractional = timeSynchronizer->GetMinDeltaTS24().ToUnsigned();
         packet.server_time_data = server_timestamp;
     } else {
-        TWAMPTimestamp server_timestamp = get_timestamp();
+        Timestamp server_timestamp = get_timestamp();
         packet.server_time_data = server_timestamp;
     }
     packet.seq_number = clientPacket->seq_number;
@@ -172,12 +172,12 @@ ReflectorPacket Server::craftReflectorPacket(ClientPacket *clientPacket, msghdr 
     packet.error_estimate = htons(0x8001);    // Sync = 1, Multiplier = 1 Taken from TWAMP C implementation.
     packet.client_time_data = clientPacket->send_time_data;
     if(args.sync_time){
-        TWAMPTimestamp send_timestamp = {};
+        Timestamp send_timestamp = {};
         send_timestamp.integer = TimeSynchronizer::LocalTimeToDatagramTS24(get_usec());
         send_timestamp.fractional = timeSynchronizer->GetMinDeltaTS24().ToUnsigned();
         packet.send_time_data = send_timestamp;
     } else {
-        TWAMPTimestamp send_timestamp = get_timestamp();
+        Timestamp send_timestamp = get_timestamp();
         packet.send_time_data = send_timestamp;
     }
 

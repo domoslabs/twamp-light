@@ -9,7 +9,7 @@
 #include "Counter.h"
 
 #define TST_PKT_SIZE 1472       //1472 (MTU 1514)
-struct TWAMPTimestamp {
+struct Timestamp {
     uint32_t integer = 0;
     uint32_t fractional = 0;
 };
@@ -17,7 +17,7 @@ struct TWAMPTimestamp {
 /* Session-Sender TWAMP-Test packet for Unauthenticated mode */
 struct ClientPacket {
     uint32_t seq_number = 0;
-    TWAMPTimestamp send_time_data = {};
+    Timestamp send_time_data = {};
     uint16_t error_estimate = 0;
     uint8_t padding[TST_PKT_SIZE - 14];
 };
@@ -27,10 +27,10 @@ struct ReflectorPacket {
     uint32_t seq_number = 0;
     uint16_t error_estimate = 0;
     uint8_t mbz1[2] = {};
-    TWAMPTimestamp server_time_data = {};
-    TWAMPTimestamp client_time_data = {};
+    Timestamp server_time_data = {};
+    Timestamp client_time_data = {};
     uint32_t sender_seq_number = 0;
-    TWAMPTimestamp send_time_data = {};
+    Timestamp send_time_data = {};
     uint16_t sender_error_estimate = 0;
     uint8_t mbz2[2] = {};
     uint8_t sender_ttl = 0;

@@ -25,13 +25,13 @@ typedef struct ip_header {
 } IPHeader;
 
 
-void timeval_to_timestamp(const struct timeval *tv, TWAMPTimestamp * ts);
+void timeval_to_timestamp(const struct timeval *tv, Timestamp * ts);
 
-void timestamp_to_timeval(const TWAMPTimestamp * ts, struct timeval *tv);
+void timestamp_to_timeval(const Timestamp * ts, struct timeval *tv);
 
-uint64_t timestamp_to_usec(const TWAMPTimestamp * ts);
+uint64_t timestamp_to_usec(const Timestamp * ts);
 uint64_t get_usec();
-TWAMPTimestamp get_timestamp();
+Timestamp get_timestamp();
 
 IPHeader get_ip_header(msghdr message);
 void set_socket_options(int socket, uint8_t ip_ttl, uint8_t timeout_secs);

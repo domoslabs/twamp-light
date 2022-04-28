@@ -21,7 +21,7 @@
 #include <cstring>
 #include <iostream>
 
-void timeval_to_timestamp(const struct timeval *tv, TWAMPTimestamp *ts) {
+void timeval_to_timestamp(const struct timeval *tv, Timestamp *ts) {
     if (!tv || !ts)
         return;
 
@@ -34,11 +34,11 @@ void timeval_to_timestamp(const struct timeval *tv, TWAMPTimestamp *ts) {
     ts->fractional = htonl(ts->fractional);
 }
 
-void timestamp_to_timeval(const TWAMPTimestamp *ts, struct timeval *tv) {
+void timestamp_to_timeval(const Timestamp *ts, struct timeval *tv) {
     if (!tv || !ts)
         return;
 
-    TWAMPTimestamp ts_host_ord;
+    Timestamp ts_host_ord;
 
     ts_host_ord.integer = ntohl(ts->integer);
     ts_host_ord.fractional = ntohl(ts->fractional);
@@ -49,15 +49,15 @@ void timestamp_to_timeval(const TWAMPTimestamp *ts, struct timeval *tv) {
                   / (double) (1uLL << 32);
 }
 
-TWAMPTimestamp get_timestamp() {
+Timestamp get_timestamp() {
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    TWAMPTimestamp ts;
+    Timestamp ts;
     timeval_to_timestamp(&tv, &ts);
     return ts;
 }
 
-uint64_t timestamp_to_usec(const TWAMPTimestamp *ts) {
+uint64_t timestamp_to_usec(const Timestamp *ts) {
     struct timeval tv;
     timestamp_to_timeval(ts, &tv);
     return (uint64_t) tv.tv_sec * 1000000 + (uint64_t) tv.tv_usec;
