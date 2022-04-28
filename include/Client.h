@@ -50,14 +50,14 @@ private:
     struct addrinfo* remote_address_info={};
     struct addrinfo* local_address_info= {};
     TimeSynchronizer* timeSynchronizer = new TimeSynchronizer();
-    ClientPacket craftSenderPacket(int idx);
+    SenderPacket craftSenderPacket(int idx);
 
     void
     handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msghdr, size_t payload_len, uint16_t packet_loss,
                           const Args &args);
 
     void
-    printMetrics(const MetricData& data);
+    printMetrics(MetricData data);
 };
 
 

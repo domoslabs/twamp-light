@@ -33,9 +33,9 @@ private:
     bool header_printed = false;
     TimeSynchronizer* timeSynchronizer = new TimeSynchronizer();
     Args args;
-    void handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t payload_len);
-    void printMetrics(const MetricData& data);
-    ReflectorPacket craftReflectorPacket(ClientPacket *clientPacket, msghdr sender_msg);
+    void handleTestPacket(SenderPacket *packet, msghdr sender_msg, size_t payload_len);
+    void printMetrics(MetricData data);
+    ReflectorPacket craftReflectorPacket(SenderPacket *sender_packet, msghdr sender_msg);
 };
 
 
