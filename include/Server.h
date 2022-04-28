@@ -14,6 +14,7 @@ struct Args{
     std::string local_port = "443";
     uint32_t num_samples = 0;
     uint8_t timeout = 10;
+    bool sync_time = true;
 };
 struct MetricData {
     std::string ip;

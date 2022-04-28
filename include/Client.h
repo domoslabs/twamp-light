@@ -23,6 +23,7 @@ struct Args {
     uint8_t timeout = 10;
     uint8_t max_retries = 10;
     uint32_t seed = 0;
+    bool sync_time = true;
 };
 struct MetricData {
     std::string ip;
@@ -41,7 +42,7 @@ struct MetricData {
 class Client {
 public:
     Client(const Args& args);
-    void sendPacket(int idx, size_t payload_len);
+    void sendPacket(int idx, size_t payload_len, const Args &args);
     bool awaitResponse(size_t payload_len, uint16_t packet_loss, const Args &args);
 
 private:
@@ -50,7 +51,7 @@ private:
     struct addrinfo* remote_address_info={};
     struct addrinfo* local_address_info= {};
     TimeSynchronizer* timeSynchronizer = new TimeSynchronizer();
-    ClientPacket craftSenderPacket(int idx);
+    ClientPacket craftSenderPacket(int idx, const Args& args);
 
     void
     handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msghdr, size_t payload_len, uint16_t packet_loss,

@@ -41,6 +41,8 @@ Server::Server(const Args& args) {
         std::cerr << strerror(errno) << std::endl;
         std::exit(EXIT_FAILURE);
     }
+
+    std::cout << args.sync_time << std::endl;
 }
 
 void Server::listen() {
@@ -94,22 +96,42 @@ void Server::handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t pa
     // Overwrite and reuse the sender message with our own data and send it back, instead of creating a new one.
     char* host = inet_ntoa(sock->sin_addr);
     uint16_t  port = ntohs(sock->sin_port);
-    timeSynchronizer->OnPeerMinDeltaTS24(packet->min_delta);
-    int64_t client_server_delay = timeSynchronizer->OnAuthenticatedDatagramTimestamp(packet->timestamp, get_usec());
+    uint64_t server_receive_time, server_send_time;
+    int64_t client_server_delay;
+    if(args.sync_time){
+        uint32_t client_timestamp = packet->send_time_data.integer;
+        uint32_t client_delta = packet->send_time_data.fractional;
+        uint32_t server_timestamp = reflector_packet.server_time_data.integer;
+        uint32_t server_delta = reflector_packet.server_time_data.fractional;
+        uint32_t send_timestamp = reflector_packet.send_time_data.integer;
+
+        timeSynchronizer->OnPeerMinDeltaTS24(client_delta);
+        client_server_delay = timeSynchronizer->OnAuthenticatedDatagramTimestamp(client_timestamp, get_usec());
+        /* Compute timestamps in usec */
+        server_receive_time = timeSynchronizer->FromLocalTime23(get_usec(), server_timestamp);
+        server_send_time = timeSynchronizer->FromLocalTime23(get_usec(), send_timestamp);
+    } else {
+        TWAMPTimestamp client_timestamp = packet->send_time_data;
+        TWAMPTimestamp server_timestamp = reflector_packet.server_time_data;
+        TWAMPTimestamp send_timestamp = reflector_packet.send_time_data;
+        client_server_delay = (int64_t)(timestamp_to_usec(&server_timestamp)-timestamp_to_usec(&client_timestamp));
+        server_receive_time = timestamp_to_usec(&server_timestamp);
+        server_send_time = timestamp_to_usec(&send_timestamp);
+    }
 
 
-    /* Compute timestamps in usec */
-    uint64_t t_receive_usec1 = reflector_packet.server_timestamp.ToUnsigned() << kTime23LostBits;
-    uint64_t t_reflsender_usec1 = reflector_packet.send_timestamp.ToUnsigned() << kTime23LostBits;
+
 
     /* Compute delays */
-    int64_t intd1 = t_reflsender_usec1 - t_receive_usec1;
+    std::cout << server_send_time << std::endl;
+    std::cout << server_receive_time << std::endl;
+    auto internal_delay = (int64_t)(server_send_time - server_receive_time);
 
     MetricData data;
     data.payload_length = payload_len;
     data.packet = reflector_packet;
     data.client_server_delay = client_server_delay;
-    data.internal_delay = intd1;
+    data.internal_delay = internal_delay;
     data.receiving_port = std::stoi(args.local_port);
     data.sending_port = port;
     data.ip = host;
@@ -131,18 +153,34 @@ void Server::handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t pa
 ReflectorPacket Server::craftReflectorPacket(ClientPacket *clientPacket, msghdr sender_msg){
 
     ReflectorPacket packet = {};
+    if(args.sync_time){
+        TWAMPTimestamp server_timestamp = {};
+        server_timestamp.integer = TimeSynchronizer::LocalTimeToDatagramTS24(get_usec());
+        server_timestamp.fractional = timeSynchronizer->GetMinDeltaTS24().ToUnsigned();
+        packet.server_time_data = server_timestamp;
+    } else {
+        TWAMPTimestamp server_timestamp = get_timestamp();
+        packet.server_time_data = server_timestamp;
+    }
     packet.seq_number = clientPacket->seq_number;
     packet.sender_seq_number = clientPacket->seq_number;
-    packet.client_timestamp = clientPacket->timestamp;
-    packet.client_min_delta = 0;
+
     packet.sender_error_estimate = clientPacket->error_estimate;
     IPHeader ipHeader = get_ip_header(sender_msg);
     packet.sender_ttl = ipHeader.ttl;
     packet.sender_tos = ipHeader.tos;
     packet.error_estimate = htons(0x8001);    // Sync = 1, Multiplier = 1 Taken from TWAMP C implementation.
-    packet.server_timestamp = TimeSynchronizer::LocalTimeToDatagramTS24(get_usec());
-    packet.server_min_delta = timeSynchronizer->GetMinDeltaTS24();
-    packet.send_timestamp = TimeSynchronizer::LocalTimeToDatagramTS24(get_usec());
+    packet.client_time_data = clientPacket->send_time_data;
+    if(args.sync_time){
+        TWAMPTimestamp send_timestamp = {};
+        send_timestamp.integer = TimeSynchronizer::LocalTimeToDatagramTS24(get_usec());
+        send_timestamp.fractional = timeSynchronizer->GetMinDeltaTS24().ToUnsigned();
+        packet.send_time_data = send_timestamp;
+    } else {
+        TWAMPTimestamp send_timestamp = get_timestamp();
+        packet.send_time_data = send_timestamp;
+    }
+
     return packet;
 }
 
@@ -157,7 +195,7 @@ void Server::printMetrics(const MetricData& data) {
     /* Sequence number */
     uint32_t snd_nb = ntohl(data.packet.sender_seq_number);
     uint32_t rcv_nb = ntohl(data.packet.seq_number);
-    uint64_t t_sender_usec1 = timeSynchronizer->FromLocalTime23(get_usec(), data.packet.client_timestamp.ToUnsigned());
+    uint64_t client_send_time = 0;
     /* Sender TOS with ECN from FW TOS */
     uint8_t fw_tos = 0;
     uint8_t snd_tos = data.packet.sender_tos + (fw_tos & 0x3) - (((fw_tos & 0x2) >> 1) & (fw_tos & 0x1));
@@ -167,7 +205,7 @@ void Server::printMetrics(const MetricData& data) {
                   << "SndTOS,"<< "FW_TOS,"<< "IntD,"<< "FWD," << "PLEN" << "\n";
         header_printed = true;
     }
-    std::cout << std::fixed << (double) t_sender_usec1* 1e-3 << "," << data.ip << "," << snd_nb << ","
+    std::cout << std::fixed << (double) client_send_time* 1e-3 << "," << data.ip << "," << snd_nb << ","
               << rcv_nb << "," << data.sending_port << "," << data.receiving_port << "," << sync1 << "," << unsigned(data.packet.sender_ttl) << "," << unsigned(snd_tos) << ","
               << unsigned(fw_tos) << "," << (double) data.internal_delay * 1e-3 << "," << (double) data.client_server_delay * 1e-3 << "," << std::to_string(data.payload_length) << "\n";
 
