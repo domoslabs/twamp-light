@@ -361,7 +361,7 @@ public:
     }
 
     /// Returns local time given remote time from packet
-    inline uint64_t FromLocalTime23(
+    inline uint64_t To64BitUSec(
             uint64_t localUsec,
             Counter23 timestamp23)
     {

@@ -108,8 +108,8 @@ void Server::handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t pa
         timeSynchronizer->OnPeerMinDeltaTS24(client_delta);
         client_server_delay = timeSynchronizer->OnAuthenticatedDatagramTimestamp(client_timestamp, get_usec());
         /* Compute timestamps in usec */
-        server_receive_time = timeSynchronizer->FromLocalTime23(get_usec(), server_timestamp);
-        server_send_time = timeSynchronizer->FromLocalTime23(get_usec(), send_timestamp);
+        server_receive_time = timeSynchronizer->To64BitUSec(get_usec(), server_timestamp);
+        server_send_time = timeSynchronizer->To64BitUSec(get_usec(), send_timestamp);
     } else {
         Timestamp client_timestamp = packet->send_time_data;
         Timestamp server_timestamp = reflector_packet.server_time_data;
