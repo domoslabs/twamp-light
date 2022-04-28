@@ -57,14 +57,9 @@ TWAMPTimestamp get_timestamp() {
     return ts;
 }
 
-uint64_t timestamp_to_usec(const TWAMPTimestamp *ts) {
+uint64_t get_usec(const TWAMPTimestamp *ts) {
     struct timeval tv;
     timestamp_to_timeval(ts, &tv);
-    return (uint64_t) tv.tv_sec * 1000000 + (uint64_t) tv.tv_usec;
-}
-uint64_t get_usec() {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
     return (uint64_t) tv.tv_sec * 1000000 + (uint64_t) tv.tv_usec;
 }
 /**
