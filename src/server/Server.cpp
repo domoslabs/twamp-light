@@ -41,8 +41,6 @@ Server::Server(const Args& args) {
         std::cerr << strerror(errno) << std::endl;
         std::exit(EXIT_FAILURE);
     }
-
-    std::cout << args.sync_time << std::endl;
 }
 
 void Server::listen() {
@@ -123,8 +121,6 @@ void Server::handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t pa
 
 
     /* Compute delays */
-    std::cout << server_send_time << std::endl;
-    std::cout << server_receive_time << std::endl;
     auto internal_delay = (int64_t)(server_send_time - server_receive_time);
 
     MetricData data;

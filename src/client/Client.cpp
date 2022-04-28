@@ -43,7 +43,6 @@ Client::Client(const Args& args) {
         std::cerr << strerror(errno) << std::endl;
         throw;
     }
-    std::cout << args.sync_time << std::endl;
 }
 
 void Client::sendPacket(int idx, size_t payload_len, const Args &args) {
