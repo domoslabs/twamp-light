@@ -6,7 +6,7 @@ set(
         include/utils.hpp
         include/CLI11.hpp
         src/utils.cpp
-        include/packets.h src/TimeSync.cpp include/TimeSync.h)
+        include/packets.h)
 set(
         CLIENT_TARGET
         twamp-light-client

@@ -29,8 +29,8 @@ void timeval_to_timestamp(const struct timeval *tv, TWAMPTimestamp * ts);
 
 void timestamp_to_timeval(const TWAMPTimestamp * ts, struct timeval *tv);
 
-uint64_t timestamp_to_usec(const TWAMPTimestamp * ts);
-uint64_t get_usec();
+uint64_t get_usec(const TWAMPTimestamp * ts);
+
 TWAMPTimestamp get_timestamp();
 
 IPHeader get_ip_header(msghdr message);
