@@ -199,3 +199,15 @@ bool isWithinEpsilon(double a, double b, double percentEpsilon)
 {
     return (std::abs(a - b) <= (std::max(std::abs(a), std::abs(b)) * percentEpsilon));
 }
+Timestamp ntohts(Timestamp ts){
+    Timestamp out = {};
+    out.integer = ntohl(ts.integer);
+    out.fractional = ntohl(ts.fractional);
+    return out;
+}
+Timestamp htonts(Timestamp ts){
+    Timestamp out = {};
+    out.integer = htonl(ts.integer);
+    out.fractional = htonl(ts.fractional);
+    return out;
+}

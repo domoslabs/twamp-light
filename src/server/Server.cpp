@@ -94,27 +94,29 @@ void Server::handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t pa
     // Overwrite and reuse the sender message with our own data and send it back, instead of creating a new one.
     char* host = inet_ntoa(sock->sin_addr);
     uint16_t  port = ntohs(sock->sin_port);
-    uint64_t server_receive_time, server_send_time;
+    uint64_t server_receive_time, server_send_time, initial_send_time;
     int64_t client_server_delay;
     if(args.sync_time){
-        uint32_t client_timestamp = packet->send_time_data.integer;
-        uint32_t client_delta = packet->send_time_data.fractional;
-        uint32_t server_timestamp = reflector_packet.server_time_data.integer;
-        uint32_t server_delta = reflector_packet.server_time_data.fractional;
-        uint32_t send_timestamp = reflector_packet.send_time_data.integer;
+        uint32_t client_timestamp = ntohl(packet->send_time_data.integer);
+        uint32_t client_delta = ntohl(packet->send_time_data.fractional);
+        uint32_t server_timestamp = ntohl(reflector_packet.server_time_data.integer);
+        uint32_t server_delta = ntohl(reflector_packet.server_time_data.fractional);
+        uint32_t send_timestamp = ntohl(reflector_packet.send_time_data.integer);
 
         timeSynchronizer->OnPeerMinDeltaTS24(client_delta);
         client_server_delay = timeSynchronizer->OnAuthenticatedDatagramTimestamp(client_timestamp, get_usec());
         /* Compute timestamps in usec */
         server_receive_time = timeSynchronizer->To64BitUSec(get_usec(), server_timestamp);
         server_send_time = timeSynchronizer->To64BitUSec(get_usec(), send_timestamp);
+        initial_send_time = timeSynchronizer->To64BitUSec(get_usec(), client_timestamp);
     } else {
-        Timestamp client_timestamp = packet->send_time_data;
-        Timestamp server_timestamp = reflector_packet.server_time_data;
-        Timestamp send_timestamp = reflector_packet.send_time_data;
+        Timestamp client_timestamp = ntohts(packet->send_time_data);
+        Timestamp server_timestamp = ntohts(reflector_packet.server_time_data);
+        Timestamp send_timestamp = ntohts(reflector_packet.send_time_data);
         client_server_delay = (int64_t)(timestamp_to_usec(&server_timestamp)-timestamp_to_usec(&client_timestamp));
         server_receive_time = timestamp_to_usec(&server_timestamp);
         server_send_time = timestamp_to_usec(&send_timestamp);
+        initial_send_time = timestamp_to_usec(&client_timestamp);
     }
 
 
@@ -130,6 +132,7 @@ void Server::handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t pa
     data.internal_delay = internal_delay;
     data.receiving_port = std::stoi(args.local_port);
     data.sending_port = port;
+    data.initial_send_time = initial_send_time;
     data.ip = host;
     printMetrics(data);
     msghdr message = sender_msg;
@@ -153,10 +156,10 @@ ReflectorPacket Server::craftReflectorPacket(ClientPacket *clientPacket, msghdr 
         Timestamp server_timestamp = {};
         server_timestamp.integer = TimeSynchronizer::LocalTimeToDatagramTS24(get_usec());
         server_timestamp.fractional = timeSynchronizer->GetMinDeltaTS24().ToUnsigned();
-        packet.server_time_data = server_timestamp;
+        packet.server_time_data = htonts(server_timestamp);
     } else {
         Timestamp server_timestamp = get_timestamp();
-        packet.server_time_data = server_timestamp;
+        packet.server_time_data = htonts(server_timestamp);
     }
     packet.seq_number = clientPacket->seq_number;
     packet.sender_seq_number = clientPacket->seq_number;
@@ -171,10 +174,10 @@ ReflectorPacket Server::craftReflectorPacket(ClientPacket *clientPacket, msghdr 
         Timestamp send_timestamp = {};
         send_timestamp.integer = TimeSynchronizer::LocalTimeToDatagramTS24(get_usec());
         send_timestamp.fractional = timeSynchronizer->GetMinDeltaTS24().ToUnsigned();
-        packet.send_time_data = send_timestamp;
+        packet.send_time_data = htonts(send_timestamp);
     } else {
         Timestamp send_timestamp = get_timestamp();
-        packet.send_time_data = send_timestamp;
+        packet.send_time_data = htonts(send_timestamp);
     }
 
     return packet;
@@ -191,15 +194,7 @@ void Server::printMetrics(const MetricData& data) {
     /* Sequence number */
     uint32_t snd_nb = ntohl(data.packet.sender_seq_number);
     uint32_t rcv_nb = ntohl(data.packet.seq_number);
-    uint64_t client_send_time = 0;
-    if(args.sync_time){
-        client_send_time = timeSynchronizer->To64BitUSec(get_usec(), data.packet.client_time_data.integer);
-    } else {
-        Timestamp ts = {};
-        ts.integer = data.packet.client_time_data.integer;
-        ts.fractional = data.packet.client_time_data.fractional;
-        client_send_time = timestamp_to_usec(&ts);
-    }
+    uint64_t client_send_time = data.initial_send_time;
     /* Sender TOS with ECN from FW TOS */
     uint8_t fw_tos = 0;
     uint8_t snd_tos = data.packet.sender_tos + (fw_tos & 0x3) - (((fw_tos & 0x2) >> 1) & (fw_tos & 0x1));

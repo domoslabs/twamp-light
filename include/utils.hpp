@@ -56,4 +56,6 @@ Iter select_randomly(Iter start, Iter end, uint32_t seed=0) {
     static std::mt19937 gen(seed==0 ? rd() : seed);
     return select_randomly(start, end, gen);
 }
+Timestamp ntohts(Timestamp ts);
+Timestamp htonts(Timestamp ts);
 #endif //DOMOS_TWAMP_LIGHT_TWAMP_LIGHT_HPP

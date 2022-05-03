@@ -72,11 +72,13 @@ ClientPacket Client::craftSenderPacket(int idx, const Args& args){
     if(args.sync_time){
         uint32_t ts = TimeSynchronizer::LocalTimeToDatagramTS24(get_usec());
         uint32_t delta = timeSynchronizer->GetMinDeltaTS24().ToUnsigned();
-        packet.send_time_data.integer = ts;
-        packet.send_time_data.fractional = delta;
+        Timestamp send_time_data = {};
+        send_time_data.integer = ts;
+        send_time_data.fractional = delta;
+        packet.send_time_data = htonts(send_time_data);
     } else {
         auto ts = get_timestamp();
-        packet.send_time_data = ts;
+        packet.send_time_data = htonts(ts);
     }
     return packet;
 }
@@ -123,14 +125,14 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msgh
     uint64_t client_send_time, server_receive_time, server_send_time;
     uint64_t client_receive_time = get_usec();
     if(args.sync_time){
-        uint32_t server_timestamp = reflectorPacket->server_time_data.integer;
-        uint32_t server_delta = reflectorPacket->server_time_data.fractional;
+        uint32_t server_timestamp = ntohl(reflectorPacket->server_time_data.integer);
+        uint32_t server_delta = ntohl(reflectorPacket->server_time_data.fractional);
 
-        uint32_t client_timestamp = reflectorPacket->client_time_data.integer;
-        uint32_t client_delta = reflectorPacket->client_time_data.fractional;
+        uint32_t client_timestamp = ntohl(reflectorPacket->client_time_data.integer);
+        uint32_t client_delta = ntohl(reflectorPacket->client_time_data.fractional);
 
-        uint32_t send_timestamp = reflectorPacket->send_time_data.integer;
-        uint32_t send_delta = reflectorPacket->send_time_data.fractional;
+        uint32_t send_timestamp = ntohl(reflectorPacket->send_time_data.integer);
+        uint32_t send_delta = ntohl(reflectorPacket->send_time_data.fractional);
 
         server_client_delay = timeSynchronizer->OnAuthenticatedDatagramTimestamp(server_timestamp, get_usec());
         timeSynchronizer->OnPeerMinDeltaTS24(server_delta);
@@ -148,9 +150,12 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msgh
         rtt = (int64_t)(client_receive_time - client_send_time);
     } else {
         /* Compute timestamps in usec */
-        client_send_time = timestamp_to_usec(&reflectorPacket->client_time_data);
-        server_receive_time = timestamp_to_usec(&reflectorPacket->server_time_data);
-        server_send_time = timestamp_to_usec(&reflectorPacket->send_time_data);
+        auto client_timestamp = ntohts(reflectorPacket->client_time_data);
+        auto server_timestamp = ntohts(reflectorPacket->server_time_data);
+        auto send_timestamp = ntohts(reflectorPacket->send_time_data);
+        client_send_time = timestamp_to_usec(&client_timestamp);
+        server_receive_time = timestamp_to_usec(&server_timestamp);
+        server_send_time = timestamp_to_usec(&send_timestamp);
 
         /* Compute delays */
         internal_delay = (int64_t)(server_send_time - server_receive_time);
