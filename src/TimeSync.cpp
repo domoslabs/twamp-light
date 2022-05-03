@@ -109,9 +109,6 @@ unsigned TimeSynchronizer::OnAuthenticatedDatagramTimestamp(
     const Counter24 localTS24 = (uint32_t)(localRecvUsec >> kTime23LostBits);
 
     // OWD_i + ClockDelta(L-R)_i = Local Receive Time - Remote Send Time
-    std::cout << localTS24.Value << std::endl;
-    std::cout << remoteSendTS24.Value << std::endl;
-    std::cout << "----"<<std::endl;
     const Counter24 deltaTS24 = localTS24 - remoteSendTS24;
 
     WindowedMinTS24Deltas.Update(deltaTS24, localRecvUsec, kDriftWindowUsec);

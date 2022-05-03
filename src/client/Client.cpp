@@ -125,7 +125,6 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msgh
     if(args.sync_time){
         uint32_t server_timestamp = reflectorPacket->server_time_data.integer;
         uint32_t server_delta = reflectorPacket->server_time_data.fractional;
-        std::cout << std::fixed <<server_delta<< std::endl;
 
         uint32_t client_timestamp = reflectorPacket->client_time_data.integer;
         uint32_t client_delta = reflectorPacket->client_time_data.fractional;
