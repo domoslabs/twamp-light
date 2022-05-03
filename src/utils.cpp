@@ -20,6 +20,7 @@
 #include <cstdio>
 #include <cstring>
 #include <iostream>
+#include "cstdlib"
 
 void timeval_to_timestamp(const struct timeval *tv, Timestamp *ts) {
     if (!tv || !ts)
@@ -194,4 +195,7 @@ void set_socket_tos(int socket, uint8_t ip_tos)
             "No way to set the TOS value for leaving packets on that platform.\n");
 #endif
 }
-
+bool isWithinEpsilon(double a, double b, double percentEpsilon)
+{
+    return (std::abs(a - b) <= (std::max(std::abs(a), std::abs(b)) * percentEpsilon));
+}

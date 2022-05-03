@@ -36,6 +36,7 @@ Timestamp get_timestamp();
 IPHeader get_ip_header(msghdr message);
 void set_socket_options(int socket, uint8_t ip_ttl, uint8_t timeout_secs);
 void set_socket_tos(int socket, uint8_t ip_tos);
+bool isWithinEpsilon(double a, double b, double percentEpsilon);
 template <class T>
 std::string vectorToString(std::vector<T> vec, std::string sep){
     std::stringstream result;
@@ -55,6 +56,4 @@ Iter select_randomly(Iter start, Iter end, uint32_t seed=0) {
     static std::mt19937 gen(seed==0 ? rd() : seed);
     return select_randomly(start, end, gen);
 }
-uint64_t combine_uint32(uint32_t a, uint32_t b);
-void split_uint64(uint64_t src, uint32_t& a, uint32_t& b);
 #endif //DOMOS_TWAMP_LIGHT_TWAMP_LIGHT_HPP

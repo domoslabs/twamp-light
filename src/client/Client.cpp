@@ -175,7 +175,11 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msgh
     printMetrics(data);
 }
 void Client::printMetrics(const MetricData& data) {
-    char sync = 'Y';
+    char sync = 'N';
+    uint64_t estimated_rtt = data.client_server_delay+data.server_client_delay+data.internal_delay;
+    if(isWithinEpsilon((double)data.rtt_delay*1e-3, (double)estimated_rtt*1e-3, 0.01)){
+        sync = 'Y';
+    }
     if ((data.client_server_delay < 0) || (data.server_client_delay < 0)) {
         sync = 'N';
     }
