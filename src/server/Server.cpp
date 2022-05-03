@@ -192,6 +192,14 @@ void Server::printMetrics(const MetricData& data) {
     uint32_t snd_nb = ntohl(data.packet.sender_seq_number);
     uint32_t rcv_nb = ntohl(data.packet.seq_number);
     uint64_t client_send_time = 0;
+    if(args.sync_time){
+        client_send_time = timeSynchronizer->To64BitUSec(get_usec(), data.packet.client_time_data.integer);
+    } else {
+        Timestamp ts = {};
+        ts.integer = data.packet.client_time_data.integer;
+        ts.fractional = data.packet.client_time_data.fractional;
+        client_send_time = timestamp_to_usec(&ts);
+    }
     /* Sender TOS with ECN from FW TOS */
     uint8_t fw_tos = 0;
     uint8_t snd_tos = data.packet.sender_tos + (fw_tos & 0x3) - (((fw_tos & 0x2) >> 1) & (fw_tos & 0x1));
