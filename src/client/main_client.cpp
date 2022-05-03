@@ -27,6 +27,7 @@ Args parse_args(int argc, char **argv){
     app.add_option("-r, --retries", args.max_retries, "How many retries before terminating. Cannot be higher than the number of samples, and adjusts accordingly.")->default_str(std::to_string(args.max_retries));
     app.add_option("-d, --delay", args.delays, "How long (in millis) to wait between sending each packet. Can be multiple values, in which case it will be sampled randomly.")->default_str(vectorToString(args.delays, " "));
     app.add_option("-s, --seed", args.seed, "Seed for the RNG. 0 means random.");
+    app.add_option("--sep", args.sep, "The separator to use in the output.");
     app.add_flag("--no-sync{false}", args.sync_time, "Disables time synchronization mechanism. Not RFC-compatible, so disable to make this work with other TWAMP implementations.");
     auto opt_tos = app.add_option("-T, --tos", tos, "The TOS value (<256).")->check(CLI::Range(256))->default_str(std::to_string(args.snd_tos));
     auto opt_dscp = app.add_option("-D, --dscp", dscp, "The DSCP value (<64).")->check(CLI::Range(64))->default_str(std::to_string(args.dscp_snd));
@@ -57,8 +58,8 @@ int main(int argc, char **argv) {
     for(int i = 0; i < args.num_samples; i++){
         size_t payload_len = *select_randomly(args.payload_lens.begin(), args.payload_lens.end(), args.seed);
         uint16_t delay = *select_randomly(args.delays.begin(), args.delays.end(), args.seed);
-        client.sendPacket(i, payload_len, args);
-        bool response = client.awaitResponse(payload_len, lost_packets, args);
+        client.sendPacket(i, payload_len);
+        bool response = client.awaitResponse(payload_len, lost_packets);
         if(!response){
             lost_packets++;
             retries++;

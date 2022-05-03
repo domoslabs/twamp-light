@@ -11,6 +11,7 @@
 #include "utils.hpp"
 
 Client::Client(const Args& args) {
+    this->args = args;
     // Construct remote socket address
     struct addrinfo hints{};
     memset(&hints,0,sizeof(hints));
@@ -45,9 +46,9 @@ Client::Client(const Args& args) {
     }
 }
 
-void Client::sendPacket(int idx, size_t payload_len, const Args &args) {
+void Client::sendPacket(int idx, size_t payload_len) {
     // Send the UDP packet
-    ClientPacket senderPacket = craftSenderPacket(idx, args);
+    ClientPacket senderPacket = craftSenderPacket(idx);
     struct iovec iov[1];
     iov[0].iov_base=&senderPacket;
     iov[0].iov_len=payload_len;
@@ -65,7 +66,7 @@ void Client::sendPacket(int idx, size_t payload_len, const Args &args) {
     }
 }
 
-ClientPacket Client::craftSenderPacket(int idx, const Args& args){
+ClientPacket Client::craftSenderPacket(int idx){
     ClientPacket packet = {};
     packet.seq_number = htonl(idx);
     packet.error_estimate = htons(0x8001); // Sync = 1, Multiplier = 1.
@@ -83,7 +84,7 @@ ClientPacket Client::craftSenderPacket(int idx, const Args& args){
     return packet;
 }
 
-bool Client::awaitResponse(size_t payload_len, uint16_t  packet_loss, const Args& args) {
+bool Client::awaitResponse(size_t payload_len, uint16_t  packet_loss) {
     // Read incoming datagram
     char buffer[sizeof(ReflectorPacket)]; //We should only be receiving ReflectorPackets
     struct sockaddr src_addr{};
@@ -112,11 +113,11 @@ bool Client::awaitResponse(size_t payload_len, uint16_t  packet_loss, const Args
         return false;
     } else {
         auto *rec = (ReflectorPacket *)buffer;
-        handleReflectorPacket(rec, incoming_msg, payload_len, packet_loss, args);
+        handleReflectorPacket(rec, incoming_msg, payload_len, packet_loss);
     }
     return true;
 }
-void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msghdr, size_t payload_len, uint16_t packet_loss, const Args& args) {
+void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msghdr, size_t payload_len, uint16_t packet_loss) {
     IPHeader ipHeader = get_ip_header(msghdr);
     sockaddr_in *sock = ((sockaddr_in *)msghdr.msg_name);
     char* host = inet_ntoa(sock->sin_addr);
@@ -193,13 +194,15 @@ void Client::printMetrics(const MetricData& data) {
     uint32_t snd_sn = ntohl(data.packet.sender_seq_number);
 
     if(!header_printed){
-        std::cout << "Time,"<< "IP,"<< "Snd#,"<< "Rcv#,"<< "SndPort,"<< "RscPort,"<< "Sync,"<< "FW_TTL,"
-                  << "SW_TTL,"<< "SndTOS,"<< "FW_TOS,"<< "SW_TOS,"<< "RTT,"<< "IntD,"
-                  << "FWD,"<< "BWD,"<< "PLEN," << "LOSS" << "\n";
+        std::cout << "Time"<< args.sep << "IP"<< args.sep << "Snd#"<< args.sep << "Rcv#"<< args.sep << "SndPort"<< args.sep
+        << "RscPort"<< args.sep << "Sync"<< args.sep << "FW_TTL"<< args.sep << "SW_TTL"<< args.sep << "SndTOS"<< args.sep
+        << "FW_TOS"<< args.sep << "SW_TOS"<< args.sep << "RTT"<< args.sep << "IntD"<< args.sep << "FWD"<< args.sep
+        << "BWD"<< args.sep << "PLEN" << args.sep << "LOSS" << "\n";
         header_printed = true;
     }
-    std::cout << std::fixed << (double) data.initial_send_time * 1e-3 << "," << data.ip<< ","<< snd_sn<< ","<< rcv_sn<< ","<< data.sending_port<< ","
-              << data.receiving_port<< ","<< sync<< ","<< unsigned(data.packet.sender_ttl)<< ","<< unsigned(data.ipHeader.ttl)<< ","
-              << unsigned(data.packet.sender_tos)<< ","<< '-'<< ","<< unsigned(data.ipHeader.tos)<< ","<<(double) data.rtt_delay * 1e-3<< ","
-              <<(double) data.internal_delay* 1e-3<< ","<< (double) data.client_server_delay * 1e-3<< ","<< (double) data.server_client_delay * 1e-3<< ","<< data.payload_length<< "," << data.packet_loss << "\n";
+    std::cout << std::fixed << (double) data.initial_send_time * 1e-3 << args.sep << data.ip<< args.sep<< snd_sn<< args.sep<< rcv_sn<< args.sep<< data.sending_port<< args.sep
+              << data.receiving_port<< args.sep<< sync<< args.sep<< unsigned(data.packet.sender_ttl)<< args.sep<< unsigned(data.ipHeader.ttl)<< args.sep
+              << unsigned(data.packet.sender_tos)<< args.sep<< '-'<< args.sep<< unsigned(data.ipHeader.tos)<< args.sep<<(double) data.rtt_delay * 1e-3<< args.sep
+              <<(double) data.internal_delay* 1e-3<< args.sep<< (double) data.client_server_delay * 1e-3<< args.sep<< (double) data.server_client_delay * 1e-3<< args.sep
+              << data.payload_length<< args.sep << data.packet_loss << "\n";
 }

@@ -185,12 +185,6 @@ ReflectorPacket Server::craftReflectorPacket(ClientPacket *clientPacket, msghdr 
 
 
 void Server::printMetrics(const MetricData& data) {
-
-
-    char sync1 = 'Y';
-    if (data.client_server_delay < 0) {
-        sync1 = 'N';
-    }
     /* Sequence number */
     uint32_t snd_nb = ntohl(data.packet.sender_seq_number);
     uint32_t rcv_nb = ntohl(data.packet.seq_number);
@@ -200,12 +194,13 @@ void Server::printMetrics(const MetricData& data) {
     uint8_t snd_tos = data.packet.sender_tos + (fw_tos & 0x3) - (((fw_tos & 0x2) >> 1) & (fw_tos & 0x1));
     if(!header_printed){
 
-        std::cout << "Time," << "IP,"<< "Snd#,"<< "Rcv#,"<< "SndPort,"<< "RscPort,"<< "Sync,"<< "FW_TTL,"
-                  << "SndTOS,"<< "FW_TOS,"<< "IntD,"<< "FWD," << "PLEN" << "\n";
+        std::cout << "Time" << args.sep<< "IP"<< args.sep<< "Snd#"<< args.sep<< "Rcv#"<< args.sep<< "SndPort"<< args.sep<<
+        "RscPort"<< args.sep<< "FW_TTL"<< args.sep << "SndTOS"<< args.sep<< "FW_TOS"<< args.sep<< "IntD"<< args.sep
+        << "FWD" << args.sep<< "PLEN" << args.sep<< "\n";
         header_printed = true;
     }
-    std::cout << std::fixed << (double) client_send_time* 1e-3 << "," << data.ip << "," << snd_nb << ","
-              << rcv_nb << "," << data.sending_port << "," << data.receiving_port << "," << sync1 << "," << unsigned(data.packet.sender_ttl) << "," << unsigned(snd_tos) << ","
-              << unsigned(fw_tos) << "," << (double) data.internal_delay * 1e-3 << "," << (double) data.client_server_delay * 1e-3 << "," << std::to_string(data.payload_length) << "\n";
+    std::cout << std::fixed << (double) client_send_time* 1e-3 << args.sep << data.ip << args.sep << snd_nb << args.sep
+              << rcv_nb << args.sep << data.sending_port << args.sep << data.receiving_port << args.sep << unsigned(data.packet.sender_ttl) << args.sep << unsigned(snd_tos) << args.sep
+              << unsigned(fw_tos) << args.sep << (double) data.internal_delay * 1e-3 << args.sep << (double) data.client_server_delay * 1e-3 << args.sep << std::to_string(data.payload_length) << "\n";
 
 }

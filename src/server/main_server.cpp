@@ -10,7 +10,9 @@ Args parse_args(int argc, char **argv){
     app.add_option("-P, --local_port", args.local_port, "The port to set up the local socket on.");
     app.add_option("-n, --num_samples", args.num_samples, "Number of samples to expect before shutdown. Set to 0 to expect unlimited samples.");
     app.add_option("-t, --timeout", args.timeout, "How long (in seconds) to keep the socket open, when no packets are incoming. Set to 0 to disable timeout.")->default_str(std::to_string(args.timeout));
+    app.add_option("--sep", args.sep, "The separator to use in the output.");
     app.add_flag("--no-sync{false}", args.sync_time, "Disables time synchronization mechanism. Not RFC-compatible, so disable to make this work with other TWAMP implementations.");
+
     try{
         app.parse(argc, argv);
     }catch(const CLI::ParseError &e) {
