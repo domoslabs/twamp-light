@@ -157,7 +157,6 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msgh
         client_send_time = timestamp_to_usec(&client_timestamp);
         server_receive_time = timestamp_to_usec(&server_timestamp);
         server_send_time = timestamp_to_usec(&send_timestamp);
-
         /* Compute delays */
         internal_delay = (int64_t)(server_send_time - server_receive_time);
         client_server_delay = (int64_t)(server_receive_time-client_send_time);
@@ -200,9 +199,42 @@ void Client::printMetrics(const MetricData& data) {
         << "BWD"<< args.sep << "PLEN" << args.sep << "LOSS" << "\n";
         header_printed = true;
     }
-    std::cout << std::fixed << (double) data.initial_send_time * 1e-3 << args.sep << data.ip<< args.sep<< snd_sn<< args.sep<< rcv_sn<< args.sep<< data.sending_port<< args.sep
-              << data.receiving_port<< args.sep<< sync<< args.sep<< unsigned(data.packet.sender_ttl)<< args.sep<< unsigned(data.ipHeader.ttl)<< args.sep
-              << unsigned(data.packet.sender_tos)<< args.sep<< '-'<< args.sep<< unsigned(data.ipHeader.tos)<< args.sep<<(double) data.rtt_delay * 1e-3<< args.sep
-              <<(double) data.internal_delay* 1e-3<< args.sep<< (double) data.client_server_delay * 1e-3<< args.sep<< (double) data.server_client_delay * 1e-3<< args.sep
-              << data.payload_length<< args.sep << data.packet_loss << "\n";
+    std::cout
+    << std::fixed
+    << (double) data.initial_send_time * 1e-3
+    << args.sep
+    << data.ip
+    << args.sep
+    << snd_sn
+    << args.sep
+    << rcv_sn
+    << args.sep
+    << data.sending_port
+    << args.sep
+    << data.receiving_port
+    << args.sep
+    << sync
+    << args.sep
+    << unsigned(data.packet.sender_ttl)
+    << args.sep
+    << unsigned(data.ipHeader.ttl)
+    << args.sep
+    << unsigned(data.packet.sender_tos)
+    << args.sep
+    << '-'
+    << args.sep
+    << unsigned(data.ipHeader.tos)
+    << args.sep
+    <<(double) data.rtt_delay * 1e-3
+    << args.sep
+    <<(double) data.internal_delay* 1e-3
+    << args.sep
+    << (double) data.client_server_delay * 1e-3
+    << args.sep
+    << (double) data.server_client_delay * 1e-3
+    << args.sep
+    << data.payload_length
+    << args.sep
+    << data.packet_loss
+    << "\n";
 }

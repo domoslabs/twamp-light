@@ -31,8 +31,8 @@ void timeval_to_timestamp(const struct timeval *tv, Timestamp *ts) {
     ts->fractional = (uint32_t) ((double) tv->tv_usec * ((double) (1uLL << 32)
                                                          / (double) 1e6));
 
-    ts->integer = htonl(ts->integer);
-    ts->fractional = htonl(ts->fractional);
+    ts->integer = (ts->integer);
+    ts->fractional = (ts->fractional);
 }
 
 void timestamp_to_timeval(const Timestamp *ts, struct timeval *tv) {
@@ -41,8 +41,8 @@ void timestamp_to_timeval(const Timestamp *ts, struct timeval *tv) {
 
     Timestamp ts_host_ord;
 
-    ts_host_ord.integer = ntohl(ts->integer);
-    ts_host_ord.fractional = ntohl(ts->fractional);
+    ts_host_ord.integer = (ts->integer);
+    ts_host_ord.fractional = (ts->fractional);
 
     /* NTP to Unix time */
     tv->tv_sec = ts_host_ord.integer - 2208988800uL;
