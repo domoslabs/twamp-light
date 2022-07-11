@@ -163,7 +163,6 @@ ReflectorPacket Server::craftReflectorPacket(ClientPacket *clientPacket, msghdr 
     }
     packet.seq_number = clientPacket->seq_number;
     packet.sender_seq_number = clientPacket->seq_number;
-
     packet.sender_error_estimate = clientPacket->error_estimate;
     IPHeader ipHeader = get_ip_header(sender_msg);
     packet.sender_ttl = ipHeader.ttl;

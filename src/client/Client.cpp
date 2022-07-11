@@ -46,7 +46,7 @@ Client::Client(const Args& args) {
     }
 }
 
-void Client::sendPacket(int idx, size_t payload_len) {
+void Client::sendPacket(uint32_t idx, size_t payload_len) {
     // Send the UDP packet
     ClientPacket senderPacket = craftSenderPacket(idx);
     struct iovec iov[1];
@@ -66,7 +66,7 @@ void Client::sendPacket(int idx, size_t payload_len) {
     }
 }
 
-ClientPacket Client::craftSenderPacket(int idx){
+ClientPacket Client::craftSenderPacket(uint32_t idx){
     ClientPacket packet = {};
     packet.seq_number = htonl(idx);
     packet.error_estimate = htons(0x8001); // Sync = 1, Multiplier = 1.

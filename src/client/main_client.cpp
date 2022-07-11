@@ -22,7 +22,7 @@ Args parse_args(int argc, char **argv){
     app.add_option<std::vector<uint16_t>>("-l, --payload_lens", args.payload_lens,
             "The payload length. Must be in range (42, 1473). Can be multiple values, in which case it will be sampled randomly.")
             ->default_str(vectorToString(args.payload_lens, " "))->check(CLI::Range(42, 1473));
-    app.add_option("-n, --num_samples", args.num_samples, "Number of samples to expect.");
+    app.add_option("-n, --num_samples", args.num_samples, "Number of samples to expect. Set to 0 for unlimited.");
     app.add_option("-t, --timeout", args.timeout, "How long (in seconds) to wait for response before retrying.")->default_str(std::to_string(args.timeout));
     app.add_option("-r, --retries", args.max_retries, "How many retries before terminating. Cannot be higher than the number of samples, and adjusts accordingly.")->default_str(std::to_string(args.max_retries));
     app.add_option("-d, --delay", args.delays, "How long (in millis) to wait between sending each packet. Can be multiple values, in which case it will be sampled randomly.")->default_str(vectorToString(args.delays, " "));
@@ -55,10 +55,11 @@ int main(int argc, char **argv) {
     Client client = Client(args);
     uint16_t lost_packets = 0;
     uint16_t retries = 0;
-    for(int i = 0; i < args.num_samples; i++){
+    uint32_t index = 0;
+    while(true){
         size_t payload_len = *select_randomly(args.payload_lens.begin(), args.payload_lens.end(), args.seed);
         uint16_t delay = *select_randomly(args.delays.begin(), args.delays.end(), args.seed);
-        client.sendPacket(i, payload_len);
+        client.sendPacket(index, payload_len);
         bool response = client.awaitResponse(payload_len, lost_packets);
         if(!response){
             lost_packets++;
@@ -70,6 +71,13 @@ int main(int argc, char **argv) {
         } else {
             retries = 0;
         }
+        index++;
+        if(args.num_samples != 0){
+            if(index >= args.num_samples){
+                break;
+            }
+        }
+
         usleep(delay*1000);
     }
 }

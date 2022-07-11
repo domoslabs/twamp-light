@@ -43,7 +43,7 @@ struct MetricData {
 class Client {
 public:
     Client(const Args& args);
-    void sendPacket(int idx, size_t payload_len);
+    void sendPacket(uint32_t idx, size_t payload_len);
     bool awaitResponse(size_t payload_len, uint16_t packet_loss);
 
 private:
@@ -53,7 +53,7 @@ private:
     struct addrinfo* local_address_info= {};
     Args args;
     TimeSynchronizer* timeSynchronizer = new TimeSynchronizer();
-    ClientPacket craftSenderPacket(int idx);
+    ClientPacket craftSenderPacket(uint32_t idx);
 
     void
     handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msghdr, size_t payload_len, uint16_t packet_loss);
