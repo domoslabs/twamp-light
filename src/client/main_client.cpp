@@ -24,7 +24,7 @@ Args parse_args(int argc, char **argv){
             ->default_str(vectorToString(args.payload_lens, " "))->check(CLI::Range(42, 1473));
     app.add_option("-n, --num_samples", args.num_samples, "Number of samples to expect. Set to 0 for unlimited.");
     app.add_option("-t, --timeout", args.timeout, "How long (in seconds) to wait for response before retrying.")->default_str(std::to_string(args.timeout));
-    app.add_option("-r, --retries", args.max_retries, "How many retries before terminating. Cannot be higher than the number of samples, and adjusts accordingly.")->default_str(std::to_string(args.max_retries));
+    app.add_option("-r, --retries", args.max_retries, "How many retries before terminating. Cannot be higher than the number of samples, and adjusts accordingly. Set to 0 for unlimited retries.")->default_str(std::to_string(args.max_retries));
     app.add_option("-d, --delay", args.delays, "How long (in millis) to wait between sending each packet. Can be multiple values, in which case it will be sampled randomly.")->default_str(vectorToString(args.delays, " "));
     app.add_option("-s, --seed", args.seed, "Seed for the RNG. 0 means random.");
     app.add_option("--sep", args.sep, "The separator to use in the output.");
@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
         if(!response){
             lost_packets++;
             retries++;
-            if(retries >= args.max_retries){
+            if(retries >= args.max_retries && args.max_retries > 0){
                 std::cerr << "Too high packet loss streak, terminating..." << std::endl;
                 std::exit(EXIT_FAILURE);
             }
