@@ -286,8 +286,8 @@ void Client::printStats(int packets_sent) {
     
     printLine("mean:", sqa_stats_get_mean);
     printLine("median:", sqa_stats_get_median);
-    printLine("min:", sqa_stats_get_min);
-    printLine("max:", sqa_stats_get_max);
+    printLine("min:", sqa_stats_get_min_as_seconds);
+    printLine("max:", sqa_stats_get_max_as_seconds);
     printLine("std:", sqa_stats_get_standard_deviation);
     printLine("variance:", sqa_stats_get_variance);
     printPercentileLine("p95:", 95);

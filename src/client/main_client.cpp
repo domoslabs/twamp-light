@@ -33,7 +33,7 @@ Args parse_args(int argc, char **argv){
     app.add_option("-t, --timeout", args.timeout, "How long (in seconds) to wait for response before aborting.")->default_str(std::to_string(args.timeout));
     app.add_option("-r, --retries", args.max_retries, "How many retries before terminating. Cannot be higher than the number of samples, and adjusts accordingly. Set to 0 for unlimited retries.")->default_str(std::to_string(args.max_retries));
     app.add_option("-s, --seed", args.seed, "Seed for the RNG. 0 means random.");
-    app.add_option("-d, --print-digest", args.print_digest, "Prints a statistical summary at the end.");
+    app.add_flag("--print-digest{true}", args.print_digest, "Prints a statistical summary at the end.");
     app.add_option("--print-RTT-only", args.print_RTT_only, "Prints only the RTT values.");
     app.add_option("--sep", args.sep, "The separator to use in the output.");
     app.add_flag("--no-sync{false}", args.sync_time, "Disables time synchronization mechanism. Not RFC-compatible, so disable to make this work with other TWAMP implementations.");
