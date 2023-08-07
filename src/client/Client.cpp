@@ -5,10 +5,12 @@
 #include <netdb.h>
 #include <cstring>
 #include <iostream>
+#include <iomanip>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include "Client.h"
 #include "utils.hpp"
+
 
 Client::Client(const Args& args) {
     this->args = args;
@@ -46,6 +48,7 @@ Client::Client(const Args& args) {
     }
 }
 
+
 void Client::sendPacket(uint32_t idx, size_t payload_len) {
     // Send the UDP packet
     ClientPacket senderPacket = craftSenderPacket(idx);
@@ -59,7 +62,6 @@ void Client::sendPacket(uint32_t idx, size_t payload_len) {
     message.msg_iovlen=1;
     message.msg_control= nullptr;
     message.msg_controllen=0;
-
     if (sendmsg(fd,&message,0)==-1) {
         std::cerr << strerror(errno) << std::endl;
         throw std::runtime_error(std::string("Sending UDP message failed with error."));
@@ -84,7 +86,7 @@ ClientPacket Client::craftSenderPacket(uint32_t idx){
     return packet;
 }
 
-bool Client::awaitResponse(size_t payload_len, uint16_t  packet_loss) {
+bool Client::awaitResponse(uint16_t packet_loss) {
     // Read incoming datagram
     char buffer[sizeof(ReflectorPacket)]; //We should only be receiving ReflectorPackets
     struct sockaddr src_addr{};
@@ -100,7 +102,6 @@ bool Client::awaitResponse(size_t payload_len, uint16_t  packet_loss) {
     incoming_msg.msg_iovlen=1;
     incoming_msg.msg_control= nullptr;
     incoming_msg.msg_controllen=0;
-
     ssize_t count=recvmsg(fd, &incoming_msg, 0);
     if (count==-1) {
         if(errno == 11){
@@ -113,11 +114,12 @@ bool Client::awaitResponse(size_t payload_len, uint16_t  packet_loss) {
         return false;
     } else {
         auto *rec = (ReflectorPacket *)buffer;
-        handleReflectorPacket(rec, incoming_msg, payload_len, packet_loss);
+        handleReflectorPacket(rec, incoming_msg, count, packet_loss);
     }
     return true;
 }
-void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msghdr, size_t payload_len, uint16_t packet_loss) {
+
+void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msghdr, ssize_t payload_len, uint16_t packet_loss) {
     IPHeader ipHeader = get_ip_header(msghdr);
     sockaddr_in *sock = ((sockaddr_in *)msghdr.msg_name);
     char* host = inet_ntoa(sock->sin_addr);
@@ -177,8 +179,30 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msgh
     data.client_server_delay = client_server_delay;
     data.rtt_delay = rtt;
 
-    printMetrics(data);
+    struct timespec rtt_ts = {};
+    rtt_ts.tv_sec = rtt / 1000000;
+    rtt_ts.tv_nsec = (rtt % 1000000) * 1000;
+    struct timespec internal_delay_ts = {};
+    internal_delay_ts.tv_sec = internal_delay / 1000000;
+    internal_delay_ts.tv_nsec = (internal_delay % 1000000) * 1000;
+    struct timespec client_server_delay_ts = {};
+    client_server_delay_ts.tv_sec = client_server_delay / 1000000;
+    client_server_delay_ts.tv_nsec = (client_server_delay % 1000000) * 1000;
+    struct timespec server_client_delay_ts = {};
+    server_client_delay_ts.tv_sec = server_client_delay / 1000000;
+    server_client_delay_ts.tv_nsec = (server_client_delay % 1000000) * 1000;
+
+    sqa_stats_add_sample(Client::stats_RTT, &rtt_ts);
+    //sqa_stats_add_sample(Client::stats_internal, &internal_delay_ts);
+    sqa_stats_add_sample(Client::stats_client_server, &client_server_delay_ts);
+    sqa_stats_add_sample(Client::stats_server_client, &server_client_delay_ts);
+    if (args.print_RTT_only) {
+        std::cout << std::fixed << (double) rtt / 1e6 << "\n";
+    } else {
+        printMetrics(data);
+    }
 }
+
 void Client::printMetrics(const MetricData& data) {
     char sync = 'N';
     uint64_t estimated_rtt = data.client_server_delay+data.server_client_delay+data.internal_delay;
@@ -237,4 +261,36 @@ void Client::printMetrics(const MetricData& data) {
     << args.sep
     << data.packet_loss
     << "\n";
+}
+
+void Client::printStats(int packets_sent) {
+    std::cout << std::fixed;
+    std::cout << "Packets sent: " << packets_sent << " Packets received: " << sqa_stats_get_number_of_samples(Client::stats_RTT) << "\n";
+    std::cout << "Packets lost: " << packets_sent - sqa_stats_get_number_of_samples(Client::stats_RTT) << "\n";
+    std::cout << "Packet loss: " << (double)(packets_sent - sqa_stats_get_number_of_samples(Client::stats_RTT)) / packets_sent * 100 << "%\n";
+    std::cout << "                RTT             FWD             BWD\n";
+    
+    auto printLine = [&](const std::string& label, auto func) {
+        std::cout << " " << std::left << std::setw(10) << label << std::setprecision(6);
+        std::cout << func(Client::stats_RTT) << " s      ";
+        std::cout << func(Client::stats_client_server) << " s      ";
+        std::cout << func(Client::stats_server_client) << " s\n";
+    };
+    
+    auto printPercentileLine = [&](const std::string& label, double percentile) {
+        std::cout << " " << std::left << std::setw(10) << label << std::setprecision(6);
+        std::cout << sqa_stats_get_percentile(Client::stats_RTT, percentile) << " s      ";
+        std::cout << sqa_stats_get_percentile(Client::stats_client_server, percentile) << " s      ";
+        std::cout << sqa_stats_get_percentile(Client::stats_server_client, percentile) << " s\n";
+    };
+    
+    printLine("mean:", sqa_stats_get_mean);
+    printLine("median:", sqa_stats_get_median);
+    printLine("min:", sqa_stats_get_min);
+    printLine("max:", sqa_stats_get_max);
+    printLine("std:", sqa_stats_get_standard_deviation);
+    printLine("variance:", sqa_stats_get_variance);
+    printPercentileLine("p95:", 95);
+    printPercentileLine("p99:", 99);
+    printPercentileLine("p99.9:", 99.9);
 }

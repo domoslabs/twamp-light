@@ -1,0 +1,3 @@
+[submodule "qoo-c"]
+	path = qoo-c
+	url = https://github.com/domoslabs/qoo-c.git
