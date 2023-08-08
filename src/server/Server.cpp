@@ -35,7 +35,7 @@ Server::Server(const Args& args) {
     }
     // Setup the socket options, to be able to receive TTL and TOS
     set_socket_options(fd, HDR_TTL, args.timeout);
-    set_socket_tos(fd, 10);
+    //set_socket_tos(fd, 10);
     // Bind the socket
     if (bind(fd,res->ai_addr,res->ai_addrlen)==-1) {
         std::cerr << strerror(errno) << std::endl;
@@ -118,9 +118,6 @@ void Server::handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t pa
         server_send_time = timestamp_to_usec(&send_timestamp);
         initial_send_time = timestamp_to_usec(&client_timestamp);
     }
-
-
-
 
     /* Compute delays */
     auto internal_delay = (int64_t)(server_send_time - server_receive_time);
