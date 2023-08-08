@@ -38,9 +38,6 @@ Args parse_args(int argc, char **argv){
     app.add_option("--sep", args.sep, "The separator to use in the output.");
     app.add_flag("--no-sync{false}", args.sync_time, "Disables time synchronization mechanism. Not RFC-compatible, so disable to make this work with other TWAMP implementations.");
     auto opt_tos = app.add_option("-T, --tos", tos, "The TOS value (<256).")->check(CLI::Range(256))->default_str(std::to_string(args.snd_tos));
-    auto opt_dscp = app.add_option("-D, --dscp", dscp, "The DSCP value (<64).")->check(CLI::Range(64))->default_str(std::to_string(args.dscp_snd));
-    opt_tos->excludes(opt_dscp);
-    opt_dscp->excludes(opt_tos);
     try{
         app.parse(argc, argv);
     }catch(const CLI::ParseError &e) {
@@ -49,9 +46,6 @@ Args parse_args(int argc, char **argv){
 
     if(*opt_tos){
         args.snd_tos = tos - (((tos & 0x2) >> 1) & (tos & 0x1));
-    }
-    if(*opt_dscp){
-        args.snd_tos = dscp << 2;
     }
     if(args.max_retries > args.num_samples){
         args.max_retries = args.num_samples;

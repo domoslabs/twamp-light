@@ -35,7 +35,7 @@ Server::Server(const Args& args) {
     }
     // Setup the socket options, to be able to receive TTL and TOS
     set_socket_options(fd, HDR_TTL, args.timeout);
-    //set_socket_tos(fd, 10);
+    set_socket_tos(fd, args.snd_tos);
     // Bind the socket
     if (bind(fd,res->ai_addr,res->ai_addrlen)==-1) {
         std::cerr << strerror(errno) << std::endl;

@@ -85,6 +85,7 @@ IPHeader get_ip_header(msghdr hdr) {
     struct cmsghdr *c_msg;
     for (c_msg = CMSG_FIRSTHDR(&hdr); c_msg;
          c_msg = (CMSG_NXTHDR(&hdr, c_msg))) {
+        std::cout << "c_msg->cmsg_level: " << c_msg->cmsg_level << std::endl;
         if ((c_msg->cmsg_level == IPPROTO_IP && c_msg->cmsg_type == IP_TTL)
             || (c_msg->cmsg_level == IPPROTO_IPV6
                 && c_msg->cmsg_type == IPV6_HOPLIMIT)) {
