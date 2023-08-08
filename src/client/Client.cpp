@@ -225,7 +225,7 @@ void Client::printMetrics(const MetricData& data) {
     }
     std::cout
     << std::fixed
-    << (double) data.initial_send_time * 1e-3
+    << data.initial_send_time
     << args.sep
     << data.ip
     << args.sep

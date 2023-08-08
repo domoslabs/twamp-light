@@ -195,7 +195,7 @@ void Server::printMetrics(const MetricData& data) {
         << "FWD" << args.sep<< "PLEN" << args.sep<< "\n";
         header_printed = true;
     }
-    std::cout << std::fixed << (double) client_send_time* 1e-3 << args.sep << data.ip << args.sep << snd_nb << args.sep
+    std::cout << std::fixed << client_send_time << args.sep << data.ip << args.sep << snd_nb << args.sep
               << rcv_nb << args.sep << data.sending_port << args.sep << data.receiving_port << args.sep << unsigned(data.packet.sender_ttl) << args.sep << unsigned(snd_tos) << args.sep
               << unsigned(fw_tos) << args.sep << (double) data.internal_delay * 1e-3 << args.sep << (double) data.client_server_delay * 1e-3 << args.sep << std::to_string(data.payload_length) << "\n";
 
