@@ -137,16 +137,16 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msgh
         uint32_t send_timestamp = ntohl(reflectorPacket->send_time_data.integer);
         uint32_t send_delta = ntohl(reflectorPacket->send_time_data.fractional);
 
-        server_client_delay = timeSynchronizer->OnAuthenticatedDatagramTimestamp(server_timestamp, get_usec());
+        server_client_delay = timeSynchronizer->OnAuthenticatedDatagramTimestamp(server_timestamp, client_receive_time);
         timeSynchronizer->OnPeerMinDeltaTS24(server_delta);
         // Convert initial client send timestamp to server time, then subtract it from the server received timestamp.
-        auto a = timeSynchronizer->To64BitUSec(get_usec(), timeSynchronizer->ToRemoteTime23(timeSynchronizer->To64BitUSec(get_usec(), client_timestamp)));
-        auto b = timeSynchronizer->To64BitUSec(get_usec(), server_timestamp);
+        auto a = timeSynchronizer->To64BitUSec(client_receive_time, timeSynchronizer->ToRemoteTime23(timeSynchronizer->To64BitUSec(client_receive_time, client_timestamp)));
+        auto b = timeSynchronizer->To64BitUSec(client_receive_time, server_timestamp);
         client_server_delay = (int64_t)(b-a);
         /* Compute timestamps in usec */
-         client_send_time = timeSynchronizer->To64BitUSec(get_usec(), client_timestamp);
-         server_receive_time = timeSynchronizer->To64BitUSec(get_usec(), server_timestamp);
-         server_send_time = timeSynchronizer->To64BitUSec(get_usec(), send_timestamp);
+         client_send_time = timeSynchronizer->To64BitUSec(client_receive_time, client_timestamp);
+         server_receive_time = timeSynchronizer->To64BitUSec(client_receive_time, server_timestamp);
+         server_send_time = timeSynchronizer->To64BitUSec(client_receive_time, send_timestamp);
 
         /* Compute delays */
         internal_delay = (int64_t)(server_send_time - server_receive_time);
