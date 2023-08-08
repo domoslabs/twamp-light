@@ -16,7 +16,7 @@ struct Args{
     uint8_t timeout = 10;
     uint8_t snd_tos = 0;
     bool sync_time = true;
-    char sep = '|';
+    char sep = ',';
 };
 struct MetricData {
     std::string ip;
