@@ -21,6 +21,7 @@ struct Args {
     uint8_t snd_tos = 0;
     uint8_t dscp_snd = 0;
     uint32_t num_samples = 10;
+    uint32_t mean_inter_packet_delay = 200;
     uint8_t timeout = 10;
     uint8_t max_retries = 10;
     uint32_t seed = 0;

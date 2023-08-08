@@ -37,6 +37,7 @@ Args parse_args(int argc, char **argv){
     app.add_option("--print-RTT-only", args.print_RTT_only, "Prints only the RTT values.");
     app.add_option("--sep", args.sep, "The separator to use in the output.");
     app.add_flag("--no-sync{false}", args.sync_time, "Disables time synchronization mechanism. Not RFC-compatible, so disable to make this work with other TWAMP implementations.");
+    app.add_option("-i, --mean_inter_packet_delay", args.mean_inter_packet_delay, "The mean inter-packet delay in milliseconds.")->default_str(std::to_string(args.mean_inter_packet_delay));
     auto opt_tos = app.add_option("-T, --tos", tos, "The TOS value (<256).")->check(CLI::Range(256))->default_str(std::to_string(args.snd_tos));
     try{
         app.parse(argc, argv);
@@ -60,7 +61,7 @@ int main(int argc, char **argv) {
     uint32_t index = 0;
     std::random_device rd;  //Will be used to obtain a seed for the random number engine
     std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
-    std::exponential_distribution<> d(1.0/20000.0); //Lambda is 1.0/mean (in microseconds)
+    std::exponential_distribution<> d(1.0/(args.mean_inter_packet_delay*1000)); //Lambda is 1.0/mean (in microseconds)
     time_t start_time = time(NULL);
     int pipefd[2];
     if(pipe(pipefd) != 0) { // create a pipe for inter-process communication
@@ -80,7 +81,7 @@ int main(int argc, char **argv) {
         close(pipefd[0]); // close the read-end of the pipe
         while (index < args.num_samples) {
             size_t payload_len = *select_randomly(args.payload_lens.begin(), args.payload_lens.end(), args.seed);
-            int delay = d(gen);
+            int delay = std::max((double)std::min((double)d(gen), 10000000.0), 0.0);
             client.sendPacket(index, payload_len);
             index++;
             usleep(delay);
