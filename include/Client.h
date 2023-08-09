@@ -13,6 +13,7 @@ extern "C" {
 #include "simple-qoo.h"
 }
 struct Args {
+    std::vector<std::string> remote_hosts;
     std::string remote_host;
     std::string remote_port = "443";
     std::string local_host;
@@ -55,7 +56,7 @@ public:
 private:
     int fd = -1;
     bool header_printed = false;
-    struct addrinfo* remote_address_info={};
+    std::vector<struct addrinfo*> remote_address_info={};
     struct addrinfo* local_address_info= {};
     struct sqa_stats* stats_RTT = sqa_stats_create();
     struct sqa_stats* stats_internal = sqa_stats_create();

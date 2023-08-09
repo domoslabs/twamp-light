@@ -21,19 +21,24 @@ Client::Client(const Args& args) {
     hints.ai_socktype=SOCK_DGRAM;
     hints.ai_protocol=0;
     hints.ai_flags=AI_PASSIVE|AI_ADDRCONFIG;
-
-    int err=getaddrinfo(args.remote_host.c_str(),args.remote_port.c_str(),&hints,&remote_address_info);
-    int err2=getaddrinfo(args.local_host.empty()? nullptr : args.local_host.c_str(),args.local_port.c_str(),&hints,&local_address_info);
-    if (err!=0) {
-        std::cerr << "failed to resolve remote socket address: " << err;
-        std::exit(EXIT_FAILURE);
+    // Resize the remote_address_info vector based on the number of remote hosts
+    remote_address_info.resize(args.remote_hosts.size());
+    int i = 0;
+    for (const auto& remote_host : args.remote_hosts) {
+        int err=getaddrinfo(remote_host.c_str(), args.remote_port.c_str(), &hints, &remote_address_info[i]);
+        if (err!=0) {
+            std::cerr << "failed to resolve remote socket address: " << err;
+            std::exit(EXIT_FAILURE);
+        }
+        i++;
     }
+    int err2=getaddrinfo(args.local_host.empty()? nullptr : args.local_host.c_str(),args.local_port.c_str(),&hints,&local_address_info);
     if (err2!=0) {
-        std::cerr << "failed to resolve local socket address: " << err;
+        std::cerr << "failed to resolve local socket address: " << err2;
         std::exit(EXIT_FAILURE);
     }
     // Create the socket
-    fd=socket(remote_address_info->ai_family, remote_address_info->ai_socktype, remote_address_info->ai_protocol);
+    fd=socket(remote_address_info[0]->ai_family, remote_address_info[0]->ai_socktype, remote_address_info[0]->ai_protocol);
     if (fd==-1) {
         std::cerr << strerror(errno) << std::endl;
         throw;
@@ -51,20 +56,22 @@ Client::Client(const Args& args) {
 
 void Client::sendPacket(uint32_t idx, size_t payload_len) {
     // Send the UDP packet
-    ClientPacket senderPacket = craftSenderPacket(idx);
-    struct iovec iov[1];
-    iov[0].iov_base=&senderPacket;
-    iov[0].iov_len=payload_len;
-    struct msghdr message = {};
-    message.msg_name=remote_address_info->ai_addr;
-    message.msg_namelen=remote_address_info->ai_addrlen;
-    message.msg_iov=iov;
-    message.msg_iovlen=1;
-    message.msg_control= nullptr;
-    message.msg_controllen=0;
-    if (sendmsg(fd,&message,0)==-1) {
-        std::cerr << strerror(errno) << std::endl;
-        throw std::runtime_error(std::string("Sending UDP message failed with error."));
+    for (const auto& rai : remote_address_info) {
+        ClientPacket senderPacket = craftSenderPacket(idx);
+        struct iovec iov[1];
+        iov[0].iov_base=&senderPacket;
+        iov[0].iov_len=payload_len;
+        struct msghdr message = {};
+        message.msg_name=rai->ai_addr;
+        message.msg_namelen=rai->ai_addrlen;
+        message.msg_iov=iov;
+        message.msg_iovlen=1;
+        message.msg_control= nullptr;
+        message.msg_controllen=0;
+        if (sendmsg(fd,&message,0)==-1) {
+            std::cerr << strerror(errno) << std::endl;
+            throw std::runtime_error(std::string("Sending UDP message failed with error."));
+        }
     }
 }
 

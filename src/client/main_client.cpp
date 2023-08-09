@@ -22,7 +22,7 @@ Args parse_args(int argc, char **argv){
     uint8_t dscp = 0, tos = 0;
     CLI::App app{"Twamp-Light implementation written by Domos."};
     app.option_defaults()->always_capture_default(true);
-    app.add_option("address", args.remote_host, "The address of the remote TWAMP Server.");
+    app.add_option("addresses", args.remote_hosts, "The address of the remote TWAMP Server.");
     app.add_option("-a, --local_address", args.local_host, "The address to set up the local socket on. Auto-selects by default.");
     app.add_option("-P, --local_port", args.local_port, "The port to set up the local socket on.");
     app.add_option("-p, --port", args.remote_port, "The port that the remote server is listening on.");
@@ -95,7 +95,7 @@ int main(int argc, char **argv) {
         //Parent does the packet collecting
         time_t time_of_last_received_packet = time(NULL);
         close(pipefd[1]); // close the write-end of the pipe
-        while (time(NULL) - time_of_last_received_packet < args.timeout && index < args.num_samples)
+        while (time(NULL) - time_of_last_received_packet < args.timeout && index < args.num_samples * args.remote_hosts.size())
         {
             bool response = client.awaitResponse(lost_packets);
             if (response){
