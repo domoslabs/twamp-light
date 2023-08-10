@@ -14,8 +14,7 @@ extern "C" {
 }
 struct Args {
     std::vector<std::string> remote_hosts;
-    std::string remote_host;
-    std::string remote_port = "443";
+    std::vector<uint16_t> remote_ports;
     std::string local_host;
     std::string local_port = "445";
     std::vector<uint16_t> payload_lens = std::vector<uint16_t>();

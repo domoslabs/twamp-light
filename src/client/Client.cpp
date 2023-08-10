@@ -25,7 +25,15 @@ Client::Client(const Args& args) {
     remote_address_info.resize(args.remote_hosts.size());
     int i = 0;
     for (const auto& remote_host : args.remote_hosts) {
-        int err=getaddrinfo(remote_host.c_str(), args.remote_port.c_str(), &hints, &remote_address_info[i]);
+        const char* port = nullptr;
+        try {
+            // Convert port number to string
+            port = const_cast<char*>(std::to_string(args.remote_ports.at(i)).c_str());
+        } catch (std::out_of_range& e) {
+            std::cerr << "Not enough remote ports provided" << std::endl;
+            std::exit(EXIT_FAILURE);
+        }
+        int err=getaddrinfo(remote_host.c_str(), port, &hints, &remote_address_info[i]);
         if (err!=0) {
             std::cerr << "failed to resolve remote socket address: " << err;
             std::exit(EXIT_FAILURE);

@@ -22,10 +22,10 @@ Args parse_args(int argc, char **argv){
     uint8_t dscp = 0, tos = 0;
     CLI::App app{"Twamp-Light implementation written by Domos."};
     app.option_defaults()->always_capture_default(true);
-    app.add_option("addresses", args.remote_hosts, "The address of the remote TWAMP Server.");
+    app.add_option("addresses", args.remote_hosts, "The address of the remote TWAMP Server.")->required();
     app.add_option("-a, --local_address", args.local_host, "The address to set up the local socket on. Auto-selects by default.");
     app.add_option("-P, --local_port", args.local_port, "The port to set up the local socket on.");
-    app.add_option("-p, --port", args.remote_port, "The port that the remote server is listening on.");
+    app.add_option<std::vector<uint16_t>>("-p, --port", args.remote_ports, "The port that the remote server is listening on.")->default_str(vectorToString(args.remote_ports, " "))->check(CLI::Range(0, 65535));
     app.add_option<std::vector<uint16_t>>("-l, --payload_lens", args.payload_lens,
             "The payload length. Must be in range (42, 1473). Can be multiple values, in which case it will be sampled randomly.")
             ->default_str(vectorToString(args.payload_lens, " "))->check(CLI::Range(42, 1473));
