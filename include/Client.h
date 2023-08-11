@@ -23,7 +23,6 @@ struct Args {
     uint32_t num_samples = 10;
     uint32_t mean_inter_packet_delay = 200;
     uint8_t timeout = 10;
-    uint8_t max_retries = 10;
     uint32_t seed = 0;
     char sep = ',';
     bool sync_time = true;
