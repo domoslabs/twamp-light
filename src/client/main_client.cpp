@@ -19,7 +19,7 @@ Args parse_args(int argc, char **argv){
     args.payload_lens.push_back(1050);
     args.payload_lens.push_back(1250);
     args.payload_lens.push_back(1400);
-    uint8_t dscp = 0, tos = 0;
+    uint8_t tos = 0;
     CLI::App app{"Twamp-Light implementation written by Domos."};
     app.option_defaults()->always_capture_default(true);
     app.add_option("addresses", args.remote_hosts, "The address of the remote TWAMP Server.")->required();
@@ -75,14 +75,14 @@ int main(int argc, char **argv) {
     case 0:
         //Child does the packet generating
         close(pipefd[0]); // close the read-end of the pipe
-        while (time(NULL) - start_time < args.timeout && index < args.num_samples) {
+        while (args.num_samples == 0 || index < args.num_samples) {
             size_t payload_len = *select_randomly(args.payload_lens.begin(), args.payload_lens.end(), args.seed);
             int delay = std::max((double)std::min((double)d(gen), 10000000.0), 0.0);
             client.sendPacket(index, payload_len);
             index++;
             usleep(delay);
         }
-        sprintf(sent_packets, "%d", index);
+        sprintf(sent_packets, "%09d", index);
         write(pipefd[1], sent_packets, strlen(sent_packets)); // send the number of sent packets to the collector
         close(pipefd[1]); // close the write-end of the pipe
         exit(EXIT_SUCCESS);
@@ -91,7 +91,7 @@ int main(int argc, char **argv) {
         //Parent does the packet collecting
         time_t time_of_last_received_packet = time(NULL);
         close(pipefd[1]); // close the write-end of the pipe
-        while (time(NULL) - time_of_last_received_packet < args.timeout && index < args.num_samples * args.remote_hosts.size())
+        while (args.num_samples == 0 || index < args.num_samples * args.remote_hosts.size())
         {
             bool response = client.awaitResponse(lost_packets);
             if (response){

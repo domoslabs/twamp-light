@@ -117,7 +117,7 @@ bool Client::awaitResponse(uint16_t packet_loss) {
     incoming_msg.msg_iovlen=1;
     incoming_msg.msg_control= nullptr;
     incoming_msg.msg_controllen=0;
-    ssize_t count=recvmsg(fd, &incoming_msg, 0);
+    ssize_t count=recvmsg(fd, &incoming_msg, MSG_WAITALL);
     if (count==-1) {
         if(errno == 11){
             return false;
@@ -206,7 +206,10 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msgh
     struct timespec server_client_delay_ts = {};
     server_client_delay_ts.tv_sec = server_client_delay / 1000000;
     server_client_delay_ts.tv_nsec = (server_client_delay % 1000000) * 1000;
-
+    if (Client::first_packet_sent == 0) {
+        Client::first_packet_sent = client_send_time;
+    }
+    Client::last_packet_sent = client_send_time;
     sqa_stats_add_sample(Client::stats_RTT, &rtt_ts);
     //sqa_stats_add_sample(Client::stats_internal, &internal_delay_ts);
     sqa_stats_add_sample(Client::stats_client_server, &client_server_delay_ts);
@@ -280,6 +283,7 @@ void Client::printMetrics(const MetricData& data) {
 
 void Client::printStats(int packets_sent) {
     std::cout << std::fixed;
+    std::cout << "Time elapsed: " << (double)(Client::last_packet_sent - Client::first_packet_sent) / 1e6 << " s\n";
     std::cout << "Packets sent: " << packets_sent << " Packets received: " << sqa_stats_get_number_of_samples(Client::stats_RTT) << "\n";
     std::cout << "Packets lost: " << packets_sent - sqa_stats_get_number_of_samples(Client::stats_RTT) << "\n";
     std::cout << "Packet loss: " << (double)(packets_sent - sqa_stats_get_number_of_samples(Client::stats_RTT)) / packets_sent * 100 << "%\n";
