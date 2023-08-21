@@ -15,13 +15,15 @@ Args parse_args(int argc, char **argv){
     app.add_option("--sep", args.sep, "The separator to use in the output.");
     app.add_flag("--no-sync{false}", args.sync_time, "Disables time synchronization mechanism. Not RFC-compatible, so disable to make this work with other TWAMP implementations.");
     auto opt_tos = app.add_option("-T, --tos", tos, "The TOS value (<256).")->check(CLI::Range(256))->default_str(std::to_string(args.snd_tos));
-
-    try{
+    try {
         app.parse(argc, argv);
-    }catch(const CLI::ParseError &e) {
+    } catch(const CLI::ParseError &e) {
         std::exit((app).exit(e));
     }
 
+    if(*opt_tos){
+        args.snd_tos = tos - (((tos & 0x2) >> 1) & (tos & 0x1));
+    }
     return args;
 }
 
