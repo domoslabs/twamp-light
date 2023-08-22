@@ -19,19 +19,18 @@ Args parse_args(int argc, char **argv){
     args.payload_lens.push_back(1050);
     args.payload_lens.push_back(1250);
     args.payload_lens.push_back(1400);
-    uint8_t dscp = 0, tos = 0;
+    uint8_t tos = 0;
     CLI::App app{"Twamp-Light implementation written by Domos."};
     app.option_defaults()->always_capture_default(true);
-    app.add_option("address", args.remote_host, "The address of the remote TWAMP Server.");
+    app.add_option("addresses", args.remote_hosts, "The address of the remote TWAMP Server.")->required();
     app.add_option("-a, --local_address", args.local_host, "The address to set up the local socket on. Auto-selects by default.");
     app.add_option("-P, --local_port", args.local_port, "The port to set up the local socket on.");
-    app.add_option("-p, --port", args.remote_port, "The port that the remote server is listening on.");
+    app.add_option<std::vector<uint16_t>>("-p, --port", args.remote_ports, "The port that the remote server is listening on.")->default_str(vectorToString(args.remote_ports, " "))->check(CLI::Range(0, 65535));
     app.add_option<std::vector<uint16_t>>("-l, --payload_lens", args.payload_lens,
             "The payload length. Must be in range (42, 1473). Can be multiple values, in which case it will be sampled randomly.")
             ->default_str(vectorToString(args.payload_lens, " "))->check(CLI::Range(42, 1473));
     app.add_option("-n, --num_samples", args.num_samples, "Number of samples to expect. Set to 0 for unlimited.");
     app.add_option("-t, --timeout", args.timeout, "How long (in seconds) to wait for response before aborting.")->default_str(std::to_string(args.timeout));
-    app.add_option("-r, --retries", args.max_retries, "How many retries before terminating. Cannot be higher than the number of samples, and adjusts accordingly. Set to 0 for unlimited retries.")->default_str(std::to_string(args.max_retries));
     app.add_option("-s, --seed", args.seed, "Seed for the RNG. 0 means random.");
     app.add_flag("--print-digest{true}", args.print_digest, "Prints a statistical summary at the end.");
     app.add_option("--print-RTT-only", args.print_RTT_only, "Prints only the RTT values.");
@@ -47,9 +46,6 @@ Args parse_args(int argc, char **argv){
 
     if(*opt_tos){
         args.snd_tos = tos - (((tos & 0x2) >> 1) & (tos & 0x1));
-    }
-    if(args.max_retries > args.num_samples){
-        args.max_retries = args.num_samples;
     }
     return args;
 }
@@ -79,14 +75,14 @@ int main(int argc, char **argv) {
     case 0:
         //Child does the packet generating
         close(pipefd[0]); // close the read-end of the pipe
-        while (index < args.num_samples) {
+        while (args.num_samples == 0 || index < args.num_samples) {
             size_t payload_len = *select_randomly(args.payload_lens.begin(), args.payload_lens.end(), args.seed);
             int delay = std::max((double)std::min((double)d(gen), 10000000.0), 0.0);
             client.sendPacket(index, payload_len);
             index++;
             usleep(delay);
         }
-        sprintf(sent_packets, "%d", index);
+        sprintf(sent_packets, "%09d", index);
         write(pipefd[1], sent_packets, strlen(sent_packets)); // send the number of sent packets to the collector
         close(pipefd[1]); // close the write-end of the pipe
         exit(EXIT_SUCCESS);
@@ -95,7 +91,7 @@ int main(int argc, char **argv) {
         //Parent does the packet collecting
         time_t time_of_last_received_packet = time(NULL);
         close(pipefd[1]); // close the write-end of the pipe
-        while (time(NULL) - time_of_last_received_packet < args.timeout && index < args.num_samples)
+        while (args.num_samples == 0 || index < args.num_samples * args.remote_hosts.size())
         {
             bool response = client.awaitResponse(lost_packets);
             if (response){
