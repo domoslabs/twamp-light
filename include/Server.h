@@ -15,7 +15,7 @@ struct Args{
     uint32_t num_samples = 0;
     uint8_t timeout = 10;
     uint8_t snd_tos = 0;
-    bool sync_time = true;
+    bool sync_time = false;
     char sep = ',';
 };
 struct MetricData {

@@ -124,7 +124,7 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msgh
     sockaddr_in *sock = ((sockaddr_in *)msghdr.msg_name);
     char* host = inet_ntoa(sock->sin_addr);
     uint16_t  port = ntohs(sock->sin_port);
-    int64_t server_client_delay, client_server_delay, internal_delay, rtt;
+    uint64_t server_client_delay, client_server_delay, internal_delay, rtt;
     uint64_t client_send_time, server_receive_time, server_send_time;
     uint64_t client_receive_time = get_usec();
     if(args.sync_time){
@@ -160,10 +160,10 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msgh
         server_receive_time = timestamp_to_usec(&server_timestamp);
         server_send_time = timestamp_to_usec(&send_timestamp);
         /* Compute delays */
-        internal_delay = (int64_t)(server_send_time - server_receive_time);
-        client_server_delay = (int64_t)(server_receive_time-client_send_time);
-        server_client_delay = (int64_t)(client_receive_time-server_send_time);
-        rtt = (int64_t)(client_receive_time - client_send_time);
+        internal_delay = server_send_time - server_receive_time;
+        client_server_delay = server_receive_time - client_send_time;
+        server_client_delay = client_receive_time - server_send_time;
+        rtt = client_receive_time - client_send_time;
     }
     MetricData data;
     data.ip = host;

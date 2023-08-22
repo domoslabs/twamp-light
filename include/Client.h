@@ -26,7 +26,7 @@ struct Args {
     uint8_t max_retries = 10;
     uint32_t seed = 0;
     char sep = ',';
-    bool sync_time = true;
+    bool sync_time = false;
     bool print_digest = false;
     bool print_RTT_only = false;
 };

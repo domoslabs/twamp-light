@@ -42,8 +42,6 @@ ${COMMON_SOURCES}
 target_link_libraries(${CLIENT_TARGET} PRIVATE qoo)
 target_include_directories(
         ${CLIENT_TARGET} PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/qoo-c/src
-        ${CMAKE_CURRENT_SOURCE_DIR}/qoo-c/t-digest-c/src
 )
 
 install(TARGETS ${CLIENT_TARGET} ${SERVER_TARGET})

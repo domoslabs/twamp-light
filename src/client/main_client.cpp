@@ -36,7 +36,7 @@ Args parse_args(int argc, char **argv){
     app.add_flag("--print-digest{true}", args.print_digest, "Prints a statistical summary at the end.");
     app.add_option("--print-RTT-only", args.print_RTT_only, "Prints only the RTT values.");
     app.add_option("--sep", args.sep, "The separator to use in the output.");
-    app.add_flag("--no-sync{false}", args.sync_time, "Disables time synchronization mechanism. Not RFC-compatible, so disable to make this work with other TWAMP implementations.");
+    app.add_flag("--sync{true}", args.sync_time, "Disables time synchronization mechanism. Not RFC-compatible, so disable to make this work with other TWAMP implementations.");
     app.add_option("-i, --mean_inter_packet_delay", args.mean_inter_packet_delay, "The mean inter-packet delay in milliseconds.")->default_str(std::to_string(args.mean_inter_packet_delay));
     auto opt_tos = app.add_option("-T, --tos", tos, "The TOS value (<256).")->check(CLI::Range(256))->default_str(std::to_string(args.snd_tos));
     try{
