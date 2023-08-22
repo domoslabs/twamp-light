@@ -16,7 +16,7 @@ struct Args {
     std::vector<std::string> remote_hosts;
     std::vector<uint16_t> remote_ports;
     std::string local_host;
-    std::string local_port = "445";
+    std::string local_port = "0";
     std::vector<uint16_t> payload_lens = std::vector<uint16_t>();
     uint8_t snd_tos = 0;
     uint8_t dscp_snd = 0;
