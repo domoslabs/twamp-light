@@ -9,6 +9,19 @@
 #include "Client.h"
 #include "CLI11.hpp"
 
+// Function to parse the IP:Port format
+bool parseIPPort(const std::string& input, std::string& ip, uint16_t& port) {
+    std::cout << input << std::endl;
+    size_t colon_pos = input.find(':');
+    if (colon_pos == std::string::npos) return false;
+
+    ip = input.substr(0, colon_pos);
+    std::string port_str = input.substr(colon_pos + 1);
+
+    port = atoi(port_str.c_str());
+    return (bool)(port > 0 && port < 65536);
+}
+
 Args parse_args(int argc, char **argv){
     Args args;
     args.payload_lens.push_back(50);
@@ -22,10 +35,8 @@ Args parse_args(int argc, char **argv){
     uint8_t tos = 0;
     CLI::App app{"Twamp-Light implementation written by Domos."};
     app.option_defaults()->always_capture_default(true);
-    app.add_option("addresses", args.remote_hosts, "The address of the remote TWAMP Server.")->required();
     app.add_option("-a, --local_address", args.local_host, "The address to set up the local socket on. Auto-selects by default.");
     app.add_option("-P, --local_port", args.local_port, "The port to set up the local socket on.");
-    app.add_option<std::vector<uint16_t>>("-p, --port", args.remote_ports, "The port that the remote server is listening on.")->default_str(vectorToString(args.remote_ports, " "))->check(CLI::Range(0, 65535));
     app.add_option<std::vector<uint16_t>>("-l, --payload_lens", args.payload_lens,
             "The payload length. Must be in range (42, 1473). Can be multiple values, in which case it will be sampled randomly.")
             ->default_str(vectorToString(args.payload_lens, " "))->check(CLI::Range(42, 1473));
@@ -38,6 +49,21 @@ Args parse_args(int argc, char **argv){
     app.add_flag("--sync{true}", args.sync_time, "Disables time synchronization mechanism. Not RFC-compatible, so disable to make this work with other TWAMP implementations.");
     app.add_option("-i, --mean_inter_packet_delay", args.mean_inter_packet_delay, "The mean inter-packet delay in milliseconds.")->default_str(std::to_string(args.mean_inter_packet_delay));
     auto opt_tos = app.add_option("-T, --tos", tos, "The TOS value (<256).")->check(CLI::Range(256))->default_str(std::to_string(args.snd_tos));
+
+    std::vector<std::string> ipPortStrs;
+    app.add_option("addresses", ipPortStrs, "IPs and Ports in the format IP:Port")
+        ->required()
+        ->check([&args](const std::string& str) {
+            std::string ip;
+            uint16_t port;
+            if (!parseIPPort(str, ip, port)) {
+                return "Address must be in the format IP:Port";
+            }
+            args.remote_hosts.push_back(ip);
+            args.remote_ports.push_back(port);
+            return "";
+        });
+
     try{
         app.parse(argc, argv);
     }catch(const CLI::ParseError &e) {
