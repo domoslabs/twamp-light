@@ -40,7 +40,7 @@ Client::Client(const Args& args) {
         }
         i++;
     }
-    int err2=getaddrinfo(args.local_host.empty()? nullptr : args.local_host.c_str(),args.local_port.c_str(),&hints,&local_address_info);
+    int err2=getaddrinfo(args.local_host.empty()? nullptr : args.local_host.c_str(), args.local_port.c_str(),&hints,&local_address_info);
     if (err2!=0) {
         std::cerr << "failed to resolve local socket address: " << err2;
         std::exit(EXIT_FAILURE);

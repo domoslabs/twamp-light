@@ -11,7 +11,6 @@
 
 // Function to parse the IP:Port format
 bool parseIPPort(const std::string& input, std::string& ip, uint16_t& port) {
-    std::cout << input << std::endl;
     size_t colon_pos = input.find(':');
     if (colon_pos == std::string::npos) return false;
 
