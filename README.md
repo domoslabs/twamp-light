@@ -39,6 +39,8 @@ The server simply reflects packets, and there is therefore no sampling of any so
 
 ### Example outputs
 
+These are measurements taken from the Hilton Union Square in San Francisco, over the IETF-provided network, to an AWS server in Frankfurt during the 117th IETF.
+
 Ethernet:
 Total samples: 10000
 | Metric   | RTT        | FWD        | BWD        |
