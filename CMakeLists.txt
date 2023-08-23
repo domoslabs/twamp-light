@@ -44,4 +44,5 @@ target_include_directories(
         ${CLIENT_TARGET} PRIVATE
 )
 
-install(TARGETS ${CLIENT_TARGET} ${SERVER_TARGET})
+install(TARGETS ${CLIENT_TARGET} ${SERVER_TARGET}
+        RUNTIME DESTINATION bin)
