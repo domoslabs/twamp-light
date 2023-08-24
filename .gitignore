@@ -8,3 +8,4 @@ Makefile
 CMakeFiles
 cmake-build-debug/
 build
+packages
