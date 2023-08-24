@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <signal.h>
+#include <poll.h>
 #include "Client.h"
 #include "CLI11.hpp"
 
@@ -88,6 +89,7 @@ int main(int argc, char **argv) {
     if(pipe(pipefd) != 0) { // create a pipe for inter-process communication
         std::cerr << "Pipe failed." << std::endl;
     }
+
     pid_t pid;
     pid = fork();
     char sent_packets[10];
@@ -116,7 +118,8 @@ int main(int argc, char **argv) {
         //Parent does the packet collecting
         time_t time_of_last_received_packet = time(NULL);
         close(pipefd[1]); // close the write-end of the pipe
-        while (args.num_samples == 0 || index < args.num_samples * args.remote_hosts.size())
+        while (time(NULL) - time_of_last_received_packet < args.timeout && // timeout if no packet received for timeout seconds
+            (args.num_samples == 0 || index < args.num_samples * args.remote_hosts.size())) // run forever if num_samples is 0, otherwise run until num_samples is reached
         {
             bool response = client.awaitResponse(lost_packets);
             if (response){
@@ -124,17 +127,47 @@ int main(int argc, char **argv) {
                 index++;
             }
         }
-        read(pipefd[0], sent_packets, 10);
-        int packets_sent = atoi(sent_packets);
-        if (args.print_digest) {
-            client.printStats(packets_sent);
-        }
-        close(pipefd[0]); // close the read-end of the pipe
-        // Kill the generator
-        kill(pid, SIGKILL);
-        exit(EXIT_SUCCESS);
-        break;
-    }
+        struct pollfd waiter = {.fd = pipefd[0], .events = POLLIN};
+        switch (poll(&waiter, 1, 100)) {
+        case 0:
+            puts("The fifo timed out.");
+            break;
+        case 1:
+            if (waiter.revents & POLLIN) {
 
+                ssize_t len = read(pipefd[0], sent_packets, 9);
+                if (len < 0) {
+                    perror("read");
+                    return EXIT_FAILURE;
+                }
+                sent_packets[len] = '\0';
+                //printf("Read: %s\n", sent_packets);
+                int packets_sent = atoi(sent_packets);
+                if (args.print_digest) {
+                    client.printStats(packets_sent);
+                }
+                close(pipefd[0]); // close the read-end of the pipe
+                // Kill the generator
+                kill(pid, SIGKILL);
+                exit(EXIT_SUCCESS);
+                break;
+            } else if (waiter.revents & POLLERR) {
+                puts("Got a POLLERR");
+                return EXIT_FAILURE;
+            } else if (waiter.revents & POLLHUP) {
+            // Writer closed its end
+                goto closed;
+            }
+            break;
+        default:
+            perror("poll");
+            return EXIT_FAILURE;
+        }
+        closed:
+        if (close(pipefd[0]) < 0) {
+            perror("close");
+            return EXIT_FAILURE;
+        }
+    }
     return 0;
 }
