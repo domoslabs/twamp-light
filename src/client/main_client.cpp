@@ -130,7 +130,8 @@ int main(int argc, char **argv) {
         struct pollfd waiter = {.fd = pipefd[0], .events = POLLIN};
         switch (poll(&waiter, 1, 100)) {
         case 0:
-            puts("The fifo timed out.");
+            // puts("");
+            std::cerr << "The fifo timed out." << std::endl;
             break;
         case 1:
             if (waiter.revents & POLLIN) {
