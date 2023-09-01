@@ -17,7 +17,7 @@ struct Args {
     std::vector<uint16_t> remote_ports;
     std::string local_host;
     std::string local_port = "0";
-    std::vector<uint16_t> payload_lens = std::vector<uint16_t>();
+    std::vector<int16_t> payload_lens = {50, 250, 450, 650, 850, 1050, 1250, 1400};
     uint8_t snd_tos = 0;
     uint8_t dscp_snd = 0;
     uint32_t num_samples = 10;
@@ -69,6 +69,10 @@ private:
 
     void
     handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msghdr, ssize_t payload_len, uint16_t packet_loss);
+
+    template <typename Func>
+    void
+    printLine(const std::string& label, Func func);
 
     void
     printMetrics(const MetricData& data);
