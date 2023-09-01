@@ -25,15 +25,15 @@ Client::Client(const Args& args) {
     remote_address_info.resize(args.remote_hosts.size());
     int i = 0;
     for (const auto& remote_host : args.remote_hosts) {
-        const char* port = nullptr;
+        std::string port;
         try {
             // Convert port number to string
-            port = const_cast<char*>(std::to_string(args.remote_ports.at(i)).c_str());
+            port = std::to_string(args.remote_ports.at(i));
         } catch (std::out_of_range& e) {
             std::cerr << "Not enough remote ports provided" << std::endl;
             std::exit(EXIT_FAILURE);
         }
-        int err=getaddrinfo(remote_host.c_str(), port, &hints, &remote_address_info[i]);
+        int err=getaddrinfo(remote_host.c_str(), port.c_str(), &hints, &remote_address_info[i]);
         if (err!=0) {
             std::cerr << "failed to resolve remote socket address: " << err;
             std::exit(EXIT_FAILURE);
@@ -58,6 +58,18 @@ Client::Client(const Args& args) {
     if (bind(fd, local_address_info->ai_addr, local_address_info->ai_addrlen) == -1) {
         std::cerr << strerror(errno) << std::endl;
         throw;
+    }
+}
+
+Client::~Client() {
+    sqa_stats_destroy(stats_RTT);
+    sqa_stats_destroy(stats_internal);
+    sqa_stats_destroy(stats_client_server);
+    sqa_stats_destroy(stats_server_client);
+    for( auto& addrinfo : remote_address_info) {
+        if (addrinfo!=NULL) {
+            freeaddrinfo(addrinfo);
+        }
     }
 }
 

@@ -46,6 +46,7 @@ struct MetricData {
 class Client {
 public:
     Client(const Args& args);
+    ~Client();
     void sendPacket(uint32_t idx, size_t payload_len);
     bool awaitResponse(uint16_t packet_loss);
     void printStats(int packets_sent);
