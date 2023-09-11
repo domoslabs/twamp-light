@@ -41,11 +41,16 @@ Server::Server(const Args& args) {
         std::cerr << strerror(errno) << std::endl;
         std::exit(EXIT_FAILURE);
     }
+    freeaddrinfo(res);
+}
+
+Server::~Server() {
+    delete timeSynchronizer;
 }
 
 void Server::listen() {
     // Read incoming datagrams
-    int counter = 0;
+    uint32_t counter = 0;
     while(true){
         if(args.num_samples != 0){
             counter++;
@@ -72,7 +77,8 @@ void Server::listen() {
         if (payload_len == -1) {
             if(errno == 11){
                 std::cerr << "Socket timed out." << std::endl;
-                std::exit(EXIT_FAILURE);
+                //std::exit(EXIT_FAILURE);
+                return;
             } else {
                 printf("%s", strerror(errno));
             }
@@ -98,7 +104,7 @@ void Server::handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t pa
         uint32_t client_timestamp = ntohl(packet->send_time_data.integer);
         uint32_t client_delta = ntohl(packet->send_time_data.fractional);
         uint32_t server_timestamp = ntohl(reflector_packet.server_time_data.integer);
-        uint32_t server_delta = ntohl(reflector_packet.server_time_data.fractional);
+        // uint32_t server_delta = ntohl(reflector_packet.server_time_data.fractional);
         uint32_t send_timestamp = ntohl(reflector_packet.send_time_data.integer);
 
         timeSynchronizer->OnPeerMinDeltaTS24(client_delta);
