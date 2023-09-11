@@ -71,6 +71,10 @@ Client::~Client() {
             freeaddrinfo(addrinfo);
         }
     }
+    if (local_address_info!=NULL) {
+        freeaddrinfo(local_address_info);
+    }
+    delete timeSynchronizer;
 }
 
 
@@ -159,10 +163,10 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msgh
         uint32_t server_delta = ntohl(reflectorPacket->server_time_data.fractional);
 
         uint32_t client_timestamp = ntohl(reflectorPacket->client_time_data.integer);
-        uint32_t client_delta = ntohl(reflectorPacket->client_time_data.fractional);
+        // uint32_t client_delta = ntohl(reflectorPacket->client_time_data.fractional);
 
         uint32_t send_timestamp = ntohl(reflectorPacket->send_time_data.integer);
-        uint32_t send_delta = ntohl(reflectorPacket->send_time_data.fractional);
+        // uint32_t send_delta = ntohl(reflectorPacket->send_time_data.fractional);
 
         server_client_delay = timeSynchronizer->OnAuthenticatedDatagramTimestamp(server_timestamp, client_receive_time);
         timeSynchronizer->OnPeerMinDeltaTS24(server_delta);
@@ -209,9 +213,9 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msgh
     struct timespec rtt_ts = {};
     rtt_ts.tv_sec = rtt / 1000000;
     rtt_ts.tv_nsec = (rtt % 1000000) * 1000;
-    struct timespec internal_delay_ts = {};
-    internal_delay_ts.tv_sec = internal_delay / 1000000;
-    internal_delay_ts.tv_nsec = (internal_delay % 1000000) * 1000;
+    // struct timespec internal_delay_ts = {};
+    // internal_delay_ts.tv_sec = internal_delay / 1000000;
+    // internal_delay_ts.tv_nsec = (internal_delay % 1000000) * 1000;
     struct timespec client_server_delay_ts = {};
     client_server_delay_ts.tv_sec = client_server_delay / 1000000;
     client_server_delay_ts.tv_nsec = (client_server_delay % 1000000) * 1000;

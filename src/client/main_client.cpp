@@ -18,8 +18,13 @@ bool parseIPPort(const std::string& input, std::string& ip, uint16_t& port) {
     ip = input.substr(0, colon_pos);
     std::string port_str = input.substr(colon_pos + 1);
 
-    port = atoi(port_str.c_str());
-    return (bool)(port > 0 && port < 65536);
+    int tmpport = atoi(port_str.c_str());
+    if (tmpport > 0 && tmpport < 65536) {
+        port = (uint16_t)tmpport;
+        return true;
+    } else {
+        return false;
+    }
 }
 
 Args parse_args(int argc, char **argv){
@@ -72,7 +77,6 @@ int main(int argc, char **argv) {
     Args args = parse_args(argc, argv);
     Client client = Client(args);
     uint16_t lost_packets = 0;
-    uint16_t retries = 0;
     uint32_t index = 0;
     std::random_device rd;  //Will be used to obtain a seed for the random number engine
     std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
@@ -125,7 +129,7 @@ int main(int argc, char **argv) {
                 index++;
             }
         }
-        struct pollfd waiter = {.fd = pipefd[0], .events = POLLIN};
+        struct pollfd waiter = {.fd = pipefd[0], .events = POLLIN, .revents = 0};
         switch (poll(&waiter, 1, 100)) {
         case 0:
             std::cerr << "The fifo timed out." << std::endl;
