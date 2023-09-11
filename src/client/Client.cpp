@@ -293,6 +293,14 @@ void Client::printMetrics(const MetricData& data) {
     << "\n";
 }
 
+template <typename Func>
+void Client::printLine(const std::string& label, Func func) {
+    std::cout << " " << std::left << std::setw(10) << label << std::setprecision(6);
+    std::cout << func(this->stats_RTT) << " s      ";
+    std::cout << func(this->stats_client_server) << " s      ";
+    std::cout << func(this->stats_server_client) << " s\n";
+}
+
 void Client::printStats(int packets_sent) {
     std::cout << std::fixed;
     std::cout << "Time elapsed: " << (double)(Client::last_packet_sent - Client::first_packet_sent) / 1e6 << " s\n";
@@ -300,13 +308,6 @@ void Client::printStats(int packets_sent) {
     std::cout << "Packets lost: " << packets_sent - sqa_stats_get_number_of_samples(Client::stats_RTT) << "\n";
     std::cout << "Packet loss: " << (double)(packets_sent - sqa_stats_get_number_of_samples(Client::stats_RTT)) / packets_sent * 100 << "%\n";
     std::cout << "                RTT             FWD             BWD\n";
-    
-    auto printLine = [&](const std::string& label, auto func) {
-        std::cout << " " << std::left << std::setw(10) << label << std::setprecision(6);
-        std::cout << func(Client::stats_RTT) << " s      ";
-        std::cout << func(Client::stats_client_server) << " s      ";
-        std::cout << func(Client::stats_server_client) << " s\n";
-    };
     
     auto printPercentileLine = [&](const std::string& label, double percentile) {
         std::cout << " " << std::left << std::setw(10) << label << std::setprecision(6);
