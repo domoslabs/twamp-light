@@ -59,8 +59,6 @@ void Server::listen() {
         struct iovec iov[1];
         iov[0].iov_base = buffer;
         iov[0].iov_len = sizeof(buffer);
-        char *control_buffer = (char *) malloc(TST_PKT_SIZE);
-        uint16_t control_length = TST_PKT_SIZE;
 
         struct msghdr message{};
         message.msg_name = &src_addr;
