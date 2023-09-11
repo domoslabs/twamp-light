@@ -33,7 +33,7 @@ public:
     Server(const Args& args);
     ~Server();
 
-    void listen();
+    int listen();
 private:
     int fd;
     bool header_printed = false;

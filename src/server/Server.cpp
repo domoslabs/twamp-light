@@ -48,7 +48,7 @@ Server::~Server() {
     delete timeSynchronizer;
 }
 
-void Server::listen() {
+int Server::listen() {
     // Read incoming datagrams
     uint32_t counter = 0;
     while(true){
@@ -78,11 +78,11 @@ void Server::listen() {
             if(errno == 11){
                 std::cerr << "Socket timed out." << std::endl;
                 //std::exit(EXIT_FAILURE);
-                return;
+                return 11;
             } else {
                 printf("%s", strerror(errno));
             }
-            std::exit(EXIT_FAILURE);
+            return 1;
         } else if (message.msg_flags & MSG_TRUNC) {
             std::cout << "Datagram too large for buffer: truncated" << std::endl;
         } else {
@@ -90,6 +90,7 @@ void Server::listen() {
             handleTestPacket(rec, message, payload_len);
         }
     }
+    return 0;
 }
 
 void Server::handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t payload_len) {
