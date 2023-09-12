@@ -16,7 +16,7 @@ This outputs a client and a server executable.
 
 Optional:
 ```bash
-make install
+make install && ldconfig
 ```
 ## Usage
 Requires root access.
