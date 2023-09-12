@@ -9,3 +9,4 @@ CMakeFiles
 cmake-build-debug/
 build
 packages
+.vscode/
