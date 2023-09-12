@@ -30,5 +30,5 @@ Args parse_args(int argc, char **argv){
 int main(int argc, char **argv) {
     Args args = parse_args(argc, argv);
     Server server = Server(args);
-    server.listen();
+    return server.listen();
 }

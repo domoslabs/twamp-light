@@ -18,26 +18,22 @@ bool parseIPPort(const std::string& input, std::string& ip, uint16_t& port) {
     ip = input.substr(0, colon_pos);
     std::string port_str = input.substr(colon_pos + 1);
 
-    port = atoi(port_str.c_str());
-    return (bool)(port > 0 && port < 65536);
+    int tmpport = atoi(port_str.c_str());
+    if (tmpport > 0 && tmpport < 65536) {
+        port = (uint16_t)tmpport;
+        return true;
+    } else {
+        return false;
+    }
 }
 
 Args parse_args(int argc, char **argv){
     Args args;
-    args.payload_lens.push_back(50);
-    args.payload_lens.push_back(250);
-    args.payload_lens.push_back(450);
-    args.payload_lens.push_back(650);
-    args.payload_lens.push_back(850);
-    args.payload_lens.push_back(1050);
-    args.payload_lens.push_back(1250);
-    args.payload_lens.push_back(1400);
-    uint8_t tos = 0;
     CLI::App app{"Twamp-Light implementation written by Domos."};
     app.option_defaults()->always_capture_default(true);
     app.add_option("-a, --local_address", args.local_host, "The address to set up the local socket on. Auto-selects by default.");
     app.add_option("-P, --local_port", args.local_port, "The port to set up the local socket on.");
-    app.add_option<std::vector<uint16_t>>("-l, --payload_lens", args.payload_lens,
+    app.add_option("-l, --payload_lens", args.payload_lens,
             "The payload length. Must be in range (42, 1473). Can be multiple values, in which case it will be sampled randomly.")
             ->default_str(vectorToString(args.payload_lens, " "))->check(CLI::Range(42, 1473));
     app.add_option("-n, --num_samples", args.num_samples, "Number of samples to expect. Set to 0 for unlimited.");
@@ -48,6 +44,7 @@ Args parse_args(int argc, char **argv){
     app.add_option("--sep", args.sep, "The separator to use in the output.");
     app.add_flag("--sync{true}", args.sync_time, "Disables time synchronization mechanism. Not RFC-compatible, so disable to make this work with other TWAMP implementations.");
     app.add_option("-i, --mean_inter_packet_delay", args.mean_inter_packet_delay, "The mean inter-packet delay in milliseconds.")->default_str(std::to_string(args.mean_inter_packet_delay));
+    uint8_t tos = 0;
     auto opt_tos = app.add_option("-T, --tos", tos, "The TOS value (<256).")->check(CLI::Range(256))->default_str(std::to_string(args.snd_tos));
 
     std::vector<std::string> ipPortStrs;
@@ -75,16 +72,17 @@ Args parse_args(int argc, char **argv){
     }
     return args;
 }
+
 int main(int argc, char **argv) {
     Args args = parse_args(argc, argv);
     Client client = Client(args);
     uint16_t lost_packets = 0;
-    uint16_t retries = 0;
     uint32_t index = 0;
     std::random_device rd;  //Will be used to obtain a seed for the random number engine
     std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
     std::exponential_distribution<> d(1.0/(args.mean_inter_packet_delay*1000)); //Lambda is 1.0/mean (in microseconds)
     time_t start_time = time(NULL);
+    time_t expected_time_of_last_packet_generation = start_time + args.num_samples * args.mean_inter_packet_delay / 1000;
     int pipefd[2];
     if(pipe(pipefd) != 0) { // create a pipe for inter-process communication
         std::cerr << "Pipe failed." << std::endl;
@@ -110,7 +108,11 @@ int main(int argc, char **argv) {
             usleep(delay);
         }
         sprintf(sent_packets, "%09d", index);
-        write(pipefd[1], sent_packets, strlen(sent_packets)); // send the number of sent packets to the collector
+        // send the number of sent packets to the collector
+        if (write(pipefd[1], sent_packets, strlen(sent_packets)) <= 0) {
+            perror("write");
+            return EXIT_FAILURE;
+        } 
         close(pipefd[1]); // close the write-end of the pipe
         exit(EXIT_SUCCESS);
         break;
@@ -118,7 +120,7 @@ int main(int argc, char **argv) {
         //Parent does the packet collecting
         time_t time_of_last_received_packet = time(NULL);
         close(pipefd[1]); // close the write-end of the pipe
-        while (time(NULL) - time_of_last_received_packet < args.timeout && // timeout if no packet received for timeout seconds
+        while ((time(NULL) < expected_time_of_last_packet_generation || time(NULL) - time_of_last_received_packet < args.timeout) && // timeout if no packet received for timeout seconds
             (args.num_samples == 0 || index < args.num_samples * args.remote_hosts.size())) // run forever if num_samples is 0, otherwise run until num_samples is reached
         {
             bool response = client.awaitResponse(lost_packets);
@@ -127,10 +129,9 @@ int main(int argc, char **argv) {
                 index++;
             }
         }
-        struct pollfd waiter = {.fd = pipefd[0], .events = POLLIN};
+        struct pollfd waiter = {.fd = pipefd[0], .events = POLLIN, .revents = 0};
         switch (poll(&waiter, 1, 100)) {
         case 0:
-            // puts("");
             std::cerr << "The fifo timed out." << std::endl;
             break;
         case 1:

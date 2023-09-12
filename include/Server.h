@@ -31,11 +31,15 @@ struct MetricData {
 class Server {
 public:
     Server(const Args& args);
-    void listen();
+    ~Server();
+
+    int listen();
 private:
     int fd;
     bool header_printed = false;
+
     TimeSynchronizer* timeSynchronizer = new TimeSynchronizer();
+
     Args args;
     void handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t payload_len);
     void printMetrics(const MetricData& data);

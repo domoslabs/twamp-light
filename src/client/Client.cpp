@@ -25,15 +25,15 @@ Client::Client(const Args& args) {
     remote_address_info.resize(args.remote_hosts.size());
     int i = 0;
     for (const auto& remote_host : args.remote_hosts) {
-        const char* port = nullptr;
+        std::string port;
         try {
             // Convert port number to string
-            port = const_cast<char*>(std::to_string(args.remote_ports.at(i)).c_str());
+            port = std::to_string(args.remote_ports.at(i));
         } catch (std::out_of_range& e) {
             std::cerr << "Not enough remote ports provided" << std::endl;
             std::exit(EXIT_FAILURE);
         }
-        int err=getaddrinfo(remote_host.c_str(), port, &hints, &remote_address_info[i]);
+        int err=getaddrinfo(remote_host.c_str(), port.c_str(), &hints, &remote_address_info[i]);
         if (err!=0) {
             std::cerr << "failed to resolve remote socket address: " << err;
             std::exit(EXIT_FAILURE);
@@ -59,6 +59,22 @@ Client::Client(const Args& args) {
         std::cerr << strerror(errno) << std::endl;
         throw;
     }
+}
+
+Client::~Client() {
+    sqa_stats_destroy(stats_RTT);
+    sqa_stats_destroy(stats_internal);
+    sqa_stats_destroy(stats_client_server);
+    sqa_stats_destroy(stats_server_client);
+    for( auto& addrinfo : remote_address_info) {
+        if (addrinfo!=NULL) {
+            freeaddrinfo(addrinfo);
+        }
+    }
+    if (local_address_info!=NULL) {
+        freeaddrinfo(local_address_info);
+    }
+    delete timeSynchronizer;
 }
 
 
@@ -147,10 +163,10 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msgh
         uint32_t server_delta = ntohl(reflectorPacket->server_time_data.fractional);
 
         uint32_t client_timestamp = ntohl(reflectorPacket->client_time_data.integer);
-        uint32_t client_delta = ntohl(reflectorPacket->client_time_data.fractional);
+        // uint32_t client_delta = ntohl(reflectorPacket->client_time_data.fractional);
 
         uint32_t send_timestamp = ntohl(reflectorPacket->send_time_data.integer);
-        uint32_t send_delta = ntohl(reflectorPacket->send_time_data.fractional);
+        // uint32_t send_delta = ntohl(reflectorPacket->send_time_data.fractional);
 
         server_client_delay = timeSynchronizer->OnAuthenticatedDatagramTimestamp(server_timestamp, client_receive_time);
         timeSynchronizer->OnPeerMinDeltaTS24(server_delta);
@@ -197,9 +213,9 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msgh
     struct timespec rtt_ts = {};
     rtt_ts.tv_sec = rtt / 1000000;
     rtt_ts.tv_nsec = (rtt % 1000000) * 1000;
-    struct timespec internal_delay_ts = {};
-    internal_delay_ts.tv_sec = internal_delay / 1000000;
-    internal_delay_ts.tv_nsec = (internal_delay % 1000000) * 1000;
+    // struct timespec internal_delay_ts = {};
+    // internal_delay_ts.tv_sec = internal_delay / 1000000;
+    // internal_delay_ts.tv_nsec = (internal_delay % 1000000) * 1000;
     struct timespec client_server_delay_ts = {};
     client_server_delay_ts.tv_sec = client_server_delay / 1000000;
     client_server_delay_ts.tv_nsec = (client_server_delay % 1000000) * 1000;
@@ -281,6 +297,14 @@ void Client::printMetrics(const MetricData& data) {
     << "\n";
 }
 
+template <typename Func>
+void Client::printLine(const std::string& label, Func func) {
+    std::cout << " " << std::left << std::setw(10) << label << std::setprecision(6);
+    std::cout << func(this->stats_RTT) << " s      ";
+    std::cout << func(this->stats_client_server) << " s      ";
+    std::cout << func(this->stats_server_client) << " s\n";
+}
+
 void Client::printStats(int packets_sent) {
     std::cout << std::fixed;
     std::cout << "Time elapsed: " << (double)(Client::last_packet_sent - Client::first_packet_sent) / 1e6 << " s\n";
@@ -288,13 +312,6 @@ void Client::printStats(int packets_sent) {
     std::cout << "Packets lost: " << packets_sent - sqa_stats_get_number_of_samples(Client::stats_RTT) << "\n";
     std::cout << "Packet loss: " << (double)(packets_sent - sqa_stats_get_number_of_samples(Client::stats_RTT)) / packets_sent * 100 << "%\n";
     std::cout << "                RTT             FWD             BWD\n";
-    
-    auto printLine = [&](const std::string& label, auto func) {
-        std::cout << " " << std::left << std::setw(10) << label << std::setprecision(6);
-        std::cout << func(Client::stats_RTT) << " s      ";
-        std::cout << func(Client::stats_client_server) << " s      ";
-        std::cout << func(Client::stats_server_client) << " s\n";
-    };
     
     auto printPercentileLine = [&](const std::string& label, double percentile) {
         std::cout << " " << std::left << std::setw(10) << label << std::setprecision(6);
