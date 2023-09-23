@@ -2,10 +2,13 @@
 // Created by vladim0105 on 12/15/21.
 //
 #include <unistd.h>
+#include <fcntl.h>              /* Obtain O_* constant definitions */
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <signal.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <poll.h>
 #include "Client.h"
 #include "CLI11.hpp"
@@ -73,7 +76,14 @@ Args parse_args(int argc, char **argv){
     return args;
 }
 
+void handle_sigchld(int sig) {
+    int saved_errno = errno;
+    while (waitpid((pid_t)(-1), 0, WNOHANG) > 0) {}
+    errno = saved_errno;
+}
+
 int main(int argc, char **argv) {
+    signal(SIGCHLD, handle_sigchld);
     Args args = parse_args(argc, argv);
     Client client = Client(args);
     uint16_t lost_packets = 0;
@@ -84,7 +94,7 @@ int main(int argc, char **argv) {
     time_t start_time = time(NULL);
     time_t expected_time_of_last_packet_generation = start_time + args.num_samples * args.mean_inter_packet_delay / 1000;
     int pipefd[2];
-    if(pipe(pipefd) != 0) { // create a pipe for inter-process communication
+    if(pipe2(pipefd, O_CLOEXEC) != 0) { // create a pipe for inter-process communication
         std::cerr << "Pipe failed." << std::endl;
     }
 
