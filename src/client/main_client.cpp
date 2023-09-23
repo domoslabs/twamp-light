@@ -124,7 +124,7 @@ int main(int argc, char **argv) {
             return EXIT_FAILURE;
         } 
         close(pipefd[1]); // close the write-end of the pipe
-        exit(EXIT_SUCCESS);
+        return EXIT_SUCCESS;
         break;
     default:
         //Parent does the packet collecting
@@ -139,10 +139,13 @@ int main(int argc, char **argv) {
                 index++;
             }
         }
+        int status;
         struct pollfd waiter = {.fd = pipefd[0], .events = POLLIN, .revents = 0};
         switch (poll(&waiter, 1, 100)) {
         case 0:
             std::cerr << "The fifo timed out." << std::endl;
+            kill(pid, SIGKILL);
+            waitpid(pid, &status, 0);
             break;
         case 1:
             if (waiter.revents & POLLIN) {
@@ -160,19 +163,27 @@ int main(int argc, char **argv) {
                 }
                 close(pipefd[0]); // close the read-end of the pipe
                 // Kill the generator
+                std::cerr << "Kill the generator." << std::endl;
                 kill(pid, SIGKILL);
-                exit(EXIT_SUCCESS);
+                waitpid(pid, &status, 0);
+                return EXIT_SUCCESS;
                 break;
             } else if (waiter.revents & POLLERR) {
                 puts("Got a POLLERR");
+                kill(pid, SIGKILL);
+                waitpid(pid, &status, 0);
                 return EXIT_FAILURE;
             } else if (waiter.revents & POLLHUP) {
             // Writer closed its end
+                kill(pid, SIGKILL);
+                waitpid(pid, &status, 0);
                 goto closed;
             }
             break;
         default:
             perror("poll");
+            kill(pid, SIGKILL);
+            waitpid(pid, &status, 0);
             return EXIT_FAILURE;
         }
         closed:
