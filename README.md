@@ -26,6 +26,13 @@ To show the help message:
 ./twamp-light-client -h
 ./twamp-light-server -h
 ```
+### starting systemd service
+```bash
+sudo make install
+sudo systemctl daemon-reload
+sudo systemctl enable twamp-light-server.service
+sudo systemctl start twamp-light-server.service
+```
 ## Details
 ### Format and protocol
 The packets are formatted according to [RFC5357](https://datatracker.ietf.org/doc/html/rfc5357#page-23). 

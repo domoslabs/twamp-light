@@ -18,6 +18,8 @@ if (USE_ASAN)
   set(EXTRA_LIBS ${EXTRA_LIBS} -fsanitize=address)
 endif ()
 
+find_package (Threads)
+
 add_subdirectory(qoo-c)
 
 set(COMMON_SOURCES
@@ -54,7 +56,7 @@ src/server/main_server.cpp
 ${COMMON_SOURCES}
 )
 
-target_link_libraries(${CLIENT_TARGET} PRIVATE qoo ${EXTRA_LIBS})
+target_link_libraries(${CLIENT_TARGET} PRIVATE qoo ${EXTRA_LIBS} Threads::Threads)
 target_link_libraries(${SERVER_TARGET} PRIVATE ${EXTRA_LIBS})
 target_include_directories(
         ${CLIENT_TARGET} PRIVATE
@@ -62,3 +64,5 @@ target_include_directories(
 
 install(TARGETS ${CLIENT_TARGET} ${SERVER_TARGET} 
         RUNTIME DESTINATION bin)
+
+install(FILES systemd/twamp-light-server.service DESTINATION /lib/systemd/system) 
