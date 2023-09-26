@@ -1,0 +1,9 @@
+Package: twamp-light
+Version: 1.0.0
+Section: base
+Priority: optional
+Architecture: amd64
+Depends: 
+Maintainer: bjorn@domos.no
+Description: twamp server and client
+ for latency measuerments

@@ -1,0 +1,17 @@
+pipeline {
+    agent any
+    stages {
+        stage('build') {
+            steps {
+                sh """
+                    mkdir build
+                    cd build
+                    cmake ..
+                    make
+                    ../debian/make-deb-pkg.sh \$(cat ../VERSION.txt)
+                """
+                archiveArtifacts 'build/*.deb'
+            }
+        }
+    }
+}
