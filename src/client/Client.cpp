@@ -159,9 +159,9 @@ bool Client::awaitResponse(uint16_t packet_loss) {
         if(errno == 11){
             return false;
         } else {
-            printf("%s", strerror(errno));
+            printf("%s\n", strerror(errno));
+            return false;
         }
-        throw;
     } else if (incoming_msg.msg_flags & MSG_TRUNC) {
         return false;
     } else {
