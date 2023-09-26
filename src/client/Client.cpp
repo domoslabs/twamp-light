@@ -4,6 +4,8 @@
 
 #include <netdb.h>
 #include <cstring>
+#include <stdlib.h>
+#include <stdio.h>
 #include <iostream>
 #include <iomanip>
 #include <unistd.h>
@@ -77,6 +79,25 @@ Client::~Client() {
     delete timeSynchronizer;
 }
 
+
+void Client::runSenderThread() {
+    int index = 0;
+    std::random_device rd;  //Will be used to obtain a seed for the random number engine
+    std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
+    std::exponential_distribution<> d(1.0/(args.mean_inter_packet_delay*1000)); //Lambda is 1.0/mean (in microseconds)
+    while (args.num_samples == 0 || index < args.num_samples) {
+        size_t payload_len = *select_randomly(args.payload_lens.begin(), args.payload_lens.end(), args.seed);
+        int delay = std::max((double)std::min((double)d(gen), 10000000.0), 0.0);
+        sendPacket(index, payload_len);
+        index++;
+        usleep(delay);
+    }
+    sent_packets = index;
+}
+
+int Client::getSentPackets() {
+    return sent_packets;
+}
 
 void Client::sendPacket(uint32_t idx, size_t payload_len) {
     // Send the UDP packet
@@ -237,6 +258,13 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msgh
     }
 }
 
+void Client::printHeader() {
+    std::cout << "Time"<< args.sep << "IP"<< args.sep << "Snd#"<< args.sep << "Rcv#"<< args.sep << "SndPort"<< args.sep
+        << "RscPort"<< args.sep << "Sync"<< args.sep << "FW_TTL"<< args.sep << "SW_TTL"<< args.sep << "SndTOS"<< args.sep
+        << "FW_TOS"<< args.sep << "SW_TOS"<< args.sep << "RTT"<< args.sep << "IntD"<< args.sep << "FWD"<< args.sep
+        << "BWD"<< args.sep << "PLEN" << args.sep << "LOSS" << "\n";
+}
+
 void Client::printMetrics(const MetricData& data) {
     char sync = 'N';
     uint64_t estimated_rtt = data.client_server_delay+data.server_client_delay+data.internal_delay;
@@ -250,13 +278,6 @@ void Client::printMetrics(const MetricData& data) {
     uint32_t rcv_sn = ntohl(data.packet.seq_number);
     uint32_t snd_sn = ntohl(data.packet.sender_seq_number);
 
-    if(!header_printed){
-        std::cout << "Time"<< args.sep << "IP"<< args.sep << "Snd#"<< args.sep << "Rcv#"<< args.sep << "SndPort"<< args.sep
-        << "RscPort"<< args.sep << "Sync"<< args.sep << "FW_TTL"<< args.sep << "SW_TTL"<< args.sep << "SndTOS"<< args.sep
-        << "FW_TOS"<< args.sep << "SW_TOS"<< args.sep << "RTT"<< args.sep << "IntD"<< args.sep << "FWD"<< args.sep
-        << "BWD"<< args.sep << "PLEN" << args.sep << "LOSS" << "\n";
-        header_printed = true;
-    }
     std::cout
     << std::fixed
     << data.initial_send_time
