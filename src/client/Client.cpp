@@ -159,7 +159,7 @@ bool Client::awaitResponse(uint16_t packet_loss) {
         if(errno == 11){
             return false;
         } else {
-            printf("%s\n", strerror(errno));
+            std::cerr << strerror(errno) << std::endl;
             return false;
         }
     } else if (incoming_msg.msg_flags & MSG_TRUNC) {
