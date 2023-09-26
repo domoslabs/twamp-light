@@ -50,10 +50,13 @@ public:
     void sendPacket(uint32_t idx, size_t payload_len);
     bool awaitResponse(uint16_t packet_loss);
     void printStats(int packets_sent);
-    
+    void runSenderThread();
+    int getSentPackets();
+    void printHeader();
 
 private:
     int fd = -1;
+    int sent_packets=0;
     bool header_printed = false;
     std::vector<struct addrinfo*> remote_address_info={};
     struct addrinfo* local_address_info= {};

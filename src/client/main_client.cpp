@@ -6,7 +6,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <signal.h>
-#include <poll.h>
+#include <iostream>
+#include <thread>
 #include "Client.h"
 #include "CLI11.hpp"
 
@@ -78,98 +79,27 @@ int main(int argc, char **argv) {
     Client client = Client(args);
     uint16_t lost_packets = 0;
     uint32_t index = 0;
-    std::random_device rd;  //Will be used to obtain a seed for the random number engine
-    std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
-    std::exponential_distribution<> d(1.0/(args.mean_inter_packet_delay*1000)); //Lambda is 1.0/mean (in microseconds)
     time_t start_time = time(NULL);
     time_t expected_time_of_last_packet_generation = start_time + args.num_samples * args.mean_inter_packet_delay / 1000;
-    int pipefd[2];
-    if(pipe(pipefd) != 0) { // create a pipe for inter-process communication
-        std::cerr << "Pipe failed." << std::endl;
-    }
 
-    pid_t pid;
-    pid = fork();
-    char sent_packets[10];
-    
-    switch (pid)
+    std::thread sender_thread(&Client::runSenderThread, &client);
+    client.printHeader();
+    //Parent does the packet collecting
+    time_t time_of_last_received_packet = time(NULL);
+    while ((time(NULL) < expected_time_of_last_packet_generation || time(NULL) - time_of_last_received_packet < args.timeout) && // timeout if no packet received for timeout seconds
+        (args.num_samples == 0 || index < args.num_samples * args.remote_hosts.size())) // run forever if num_samples is 0, otherwise run until num_samples is reached
     {
-    case -1:
-        std::cerr << "Fork failed." << std::endl;
-        break;
-    case 0:
-        //Child does the packet generating
-        close(pipefd[0]); // close the read-end of the pipe
-        while (args.num_samples == 0 || index < args.num_samples) {
-            size_t payload_len = *select_randomly(args.payload_lens.begin(), args.payload_lens.end(), args.seed);
-            int delay = std::max((double)std::min((double)d(gen), 10000000.0), 0.0);
-            client.sendPacket(index, payload_len);
+        bool response = client.awaitResponse(lost_packets);
+        if (response){
+            time_of_last_received_packet = time(NULL);
             index++;
-            usleep(delay);
-        }
-        sprintf(sent_packets, "%09d", index);
-        // send the number of sent packets to the collector
-        if (write(pipefd[1], sent_packets, strlen(sent_packets)) <= 0) {
-            perror("write");
-            return EXIT_FAILURE;
-        } 
-        close(pipefd[1]); // close the write-end of the pipe
-        exit(EXIT_SUCCESS);
-        break;
-    default:
-        //Parent does the packet collecting
-        time_t time_of_last_received_packet = time(NULL);
-        close(pipefd[1]); // close the write-end of the pipe
-        while ((time(NULL) < expected_time_of_last_packet_generation || time(NULL) - time_of_last_received_packet < args.timeout) && // timeout if no packet received for timeout seconds
-            (args.num_samples == 0 || index < args.num_samples * args.remote_hosts.size())) // run forever if num_samples is 0, otherwise run until num_samples is reached
-        {
-            bool response = client.awaitResponse(lost_packets);
-            if (response){
-                time_of_last_received_packet = time(NULL);
-                index++;
-            }
-        }
-        struct pollfd waiter = {.fd = pipefd[0], .events = POLLIN, .revents = 0};
-        switch (poll(&waiter, 1, 100)) {
-        case 0:
-            std::cerr << "The fifo timed out." << std::endl;
-            break;
-        case 1:
-            if (waiter.revents & POLLIN) {
-
-                ssize_t len = read(pipefd[0], sent_packets, 9);
-                if (len < 0) {
-                    perror("read");
-                    return EXIT_FAILURE;
-                }
-                sent_packets[len] = '\0';
-                //printf("Read: %s\n", sent_packets);
-                int packets_sent = atoi(sent_packets);
-                if (args.print_digest) {
-                    client.printStats(packets_sent);
-                }
-                close(pipefd[0]); // close the read-end of the pipe
-                // Kill the generator
-                kill(pid, SIGKILL);
-                exit(EXIT_SUCCESS);
-                break;
-            } else if (waiter.revents & POLLERR) {
-                puts("Got a POLLERR");
-                return EXIT_FAILURE;
-            } else if (waiter.revents & POLLHUP) {
-            // Writer closed its end
-                goto closed;
-            }
-            break;
-        default:
-            perror("poll");
-            return EXIT_FAILURE;
-        }
-        closed:
-        if (close(pipefd[0]) < 0) {
-            perror("close");
-            return EXIT_FAILURE;
         }
     }
+    sender_thread.join();
+    int packets_sent = client.getSentPackets();
+    if (args.print_digest) {
+        client.printStats(packets_sent);
+    }
+    
     return 0;
 }
