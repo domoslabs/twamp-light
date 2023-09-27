@@ -12,6 +12,7 @@
 #include <arpa/inet.h>
 #include "Client.h"
 #include "utils.hpp"
+#include "json.hpp"
 
 
 Client::Client(const Args& args) {
@@ -336,7 +337,7 @@ void Client::printMetrics(const MetricData& data) {
 }
 
 template <typename Func>
-void Client::printLine(const std::string& label, Func func) {
+void Client::printSummaryLine(const std::string& label, Func func) {
     std::cout << " " << std::left << std::setw(10) << label << std::setprecision(6);
     std::cout << func(this->stats_RTT) << " s      ";
     std::cout << func(this->stats_client_server) << " s      ";
@@ -358,13 +359,49 @@ void Client::printStats(int packets_sent) {
         std::cout << sqa_stats_get_percentile(Client::stats_server_client, percentile) << " s\n";
     };
     
-    printLine("mean:", sqa_stats_get_mean);
-    printLine("median:", sqa_stats_get_median);
-    printLine("min:", sqa_stats_get_min_as_seconds);
-    printLine("max:", sqa_stats_get_max_as_seconds);
-    printLine("std:", sqa_stats_get_standard_deviation);
-    printLine("variance:", sqa_stats_get_variance);
+    printSummaryLine("mean:", sqa_stats_get_mean);
+    printSummaryLine("median:", sqa_stats_get_median);
+    printSummaryLine("min:", sqa_stats_get_min_as_seconds);
+    printSummaryLine("max:", sqa_stats_get_max_as_seconds);
+    printSummaryLine("std:", sqa_stats_get_standard_deviation);
+    printSummaryLine("variance:", sqa_stats_get_variance);
     printPercentileLine("p95:", 95);
     printPercentileLine("p99:", 99);
     printPercentileLine("p99.9:", 99.9);
+}
+
+nlohmann::json td_to_json(td_histogram_t *histogram) {
+    nlohmann::json json;
+    td_compress(histogram);
+    json["compression"] = histogram->compression;
+
+    // Create the digest-centroid array
+    nlohmann::json centroidsJson = nlohmann::json::array();
+    for (int i = 0; i < histogram->merged_nodes; ++i) {
+        centroidsJson.push_back({
+            {"m", histogram->nodes_mean[i]},
+            {"c", histogram->nodes_weight[i]}
+        });
+    }
+
+    json["digest-centroid"] = centroidsJson;
+    return json;
+}
+
+void Client::printJsonLog() {
+    nlohmann::json logData;
+
+    logData["qualityattenuationaggregate"] = {
+        {"numSamples", sqa_stats_get_number_of_samples(Client::stats_RTT)},
+        {"numLostSamples", sqa_stats_get_number_of_lost_packets(Client::stats_RTT)},
+        {"offset", Client::stats_RTT->offset},
+        {"maxLatency", sqa_stats_get_max_as_seconds(Client::stats_RTT)},
+        {"minLatency", sqa_stats_get_min_as_seconds(Client::stats_RTT)},
+        {"shiftedSum", Client::stats_RTT->shifted_sum},
+        {"shiftedSumOfSquares", Client::stats_RTT->shifted_sum_of_squares},
+        {"empirical_distribution", td_to_json(Client::stats_RTT->empirical_distribution)},
+    };
+
+
+    std::cout << logData.dump(4) << std::endl;
 }

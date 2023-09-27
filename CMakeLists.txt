@@ -36,6 +36,7 @@ set(COMMON_SOURCES
         src/TimeSync.cpp
         include/TimeSync.h
         include/Counter.h
+        include/json.hpp
 )
 
 set(CLIENT_TARGET twamp-light-client)

@@ -53,6 +53,7 @@ public:
     void runSenderThread();
     int getSentPackets();
     void printHeader();
+    void printJsonLog();
 
 private:
     int fd = -1;
@@ -76,7 +77,7 @@ private:
 
     template <typename Func>
     void
-    printLine(const std::string& label, Func func);
+    printSummaryLine(const std::string& label, Func func);
 
     void
     printMetrics(const MetricData& data);
