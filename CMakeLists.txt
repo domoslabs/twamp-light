@@ -6,6 +6,7 @@ set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wextra -Wall")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wextra -Wall -O0 -g")
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-psabi" )
 # set(CMAKE_CXX_FLAGS_RELEASE "-Werror -O2")
+include(cmake/getversion.cmake)
 
 option(USE_ASAN         "Build with address-sanitizer" OFF)
 

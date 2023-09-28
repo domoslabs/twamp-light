@@ -30,7 +30,9 @@ bool parseIPPort(const std::string& input, std::string& ip, uint16_t& port) {
 
 Args parse_args(int argc, char **argv){
     Args args;
-    CLI::App app{"Twamp-Light implementation written by Domos."};
+    bool print_version=false;
+    std::string title="Twamp-Light implementation written by Domos. Version "+std::string(TWAMP_VERSION_TXT);
+    CLI::App app{title.c_str()};
     app.option_defaults()->always_capture_default(true);
     app.add_option("-a, --local_address", args.local_host, "The address to set up the local socket on. Auto-selects by default.");
     app.add_option("-P, --local_port", args.local_port, "The port to set up the local socket on.");
@@ -47,10 +49,10 @@ Args parse_args(int argc, char **argv){
     app.add_option("-i, --mean_inter_packet_delay", args.mean_inter_packet_delay, "The mean inter-packet delay in milliseconds.")->default_str(std::to_string(args.mean_inter_packet_delay));
     uint8_t tos = 0;
     auto opt_tos = app.add_option("-T, --tos", tos, "The TOS value (<256).")->check(CLI::Range(256))->default_str(std::to_string(args.snd_tos));
+    app.add_flag("-V{true}, --version{true}", print_version, "Print Version info");
 
     std::vector<std::string> ipPortStrs;
     app.add_option("addresses", ipPortStrs, "IPs and Ports in the format IP:Port")
-        ->required()
         ->check([&args](const std::string& str) {
             std::string ip;
             uint16_t port;
@@ -62,10 +64,24 @@ Args parse_args(int argc, char **argv){
             return "";
         });
 
+
     try{
         app.parse(argc, argv);
     }catch(const CLI::ParseError &e) {
         std::exit((app).exit(e));
+    }
+
+    if (print_version) {
+        std::cout << "Twamp Light Version "<< std::string(TWAMP_VERSION_TXT) << std::endl;
+        std::cout << "Commit ID " <<     std::string(TWAMP_GIT_COMMIT_ID);
+        std::cout << ", git describe: " <<   std::string(TWAMP_GIT_DESCRIBE);
+        std::cout << ",  submodules: qoo-c (" << std::string(QOO_GIT_DESCRIBE) << ") ";
+        std::cout << "t-digest-c (" <<   std::string(TDIGEST_GIT_DESCRIBE) << ")" << std::endl;
+        std::exit(EXIT_SUCCESS);
+    } else { // i dont't know how to override addresses options required() modifier
+        if (ipPortStrs.empty()) {
+            std::cout << "Address must be in the format IP:Port\n"; exit(EXIT_SUCCESS);
+        }
     }
 
     if(*opt_tos){
