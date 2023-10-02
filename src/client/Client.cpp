@@ -81,7 +81,7 @@ Client::~Client() {
 
 
 void Client::runSenderThread() {
-    int index = 0;
+    uint32_t index = 0;
     std::random_device rd;  //Will be used to obtain a seed for the random number engine
     std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
     std::exponential_distribution<> d(1.0/(args.mean_inter_packet_delay*1000)); //Lambda is 1.0/mean (in microseconds)
@@ -171,88 +171,105 @@ bool Client::awaitResponse(uint16_t packet_loss) {
     return true;
 }
 
-void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msghdr, ssize_t payload_len, uint16_t packet_loss) {
-    IPHeader ipHeader = get_ip_header(msghdr);
-    sockaddr_in *sock = ((sockaddr_in *)msghdr.msg_name);
-    char* host = inet_ntoa(sock->sin_addr);
-    uint16_t  port = ntohs(sock->sin_port);
-    uint64_t server_client_delay, client_server_delay, internal_delay, rtt;
-    uint64_t client_send_time, server_receive_time, server_send_time;
-    uint64_t client_receive_time = get_usec();
-    if(args.sync_time){
+struct TimeData {
+    int64_t internal_delay;
+    int64_t server_client_delay;
+    int64_t client_server_delay;
+    int64_t rtt;
+    uint64_t client_send_time;
+    uint64_t server_receive_time;
+    uint64_t server_send_time;
+};
+
+TimeData computeTimeData(bool sync_time, uint64_t client_receive_time, ReflectorPacket *reflectorPacket, TimeSynchronizer* timeSynchronizer) {
+    TimeData timeData;
+    if(sync_time) {
         uint32_t server_timestamp = ntohl(reflectorPacket->server_time_data.integer);
         uint32_t server_delta = ntohl(reflectorPacket->server_time_data.fractional);
-
         uint32_t client_timestamp = ntohl(reflectorPacket->client_time_data.integer);
-        // uint32_t client_delta = ntohl(reflectorPacket->client_time_data.fractional);
 
-        uint32_t send_timestamp = ntohl(reflectorPacket->send_time_data.integer);
-        // uint32_t send_delta = ntohl(reflectorPacket->send_time_data.fractional);
-
-        server_client_delay = timeSynchronizer->OnAuthenticatedDatagramTimestamp(server_timestamp, client_receive_time);
+        int64_t server_client_delay = timeSynchronizer->OnAuthenticatedDatagramTimestamp(server_timestamp, client_receive_time);
         timeSynchronizer->OnPeerMinDeltaTS24(server_delta);
-        // Convert initial client send timestamp to server time, then subtract it from the server received timestamp.
+
         auto a = timeSynchronizer->To64BitUSec(client_receive_time, timeSynchronizer->ToRemoteTime23(timeSynchronizer->To64BitUSec(client_receive_time, client_timestamp)));
         auto b = timeSynchronizer->To64BitUSec(client_receive_time, server_timestamp);
-        client_server_delay = (int64_t)(b-a);
-        /* Compute timestamps in usec */
-         client_send_time = timeSynchronizer->To64BitUSec(client_receive_time, client_timestamp);
-         server_receive_time = timeSynchronizer->To64BitUSec(client_receive_time, server_timestamp);
-         server_send_time = timeSynchronizer->To64BitUSec(client_receive_time, send_timestamp);
+        int64_t client_server_delay = (int64_t)(b - a);
 
-        /* Compute delays */
-        internal_delay = (int64_t)(server_send_time - server_receive_time);
-        rtt = (int64_t)(client_receive_time - client_send_time);
+        timeData.client_send_time = timeSynchronizer->To64BitUSec(client_receive_time, client_timestamp);
+        timeData.server_receive_time = timeSynchronizer->To64BitUSec(client_receive_time, server_timestamp);
+        timeData.server_send_time = timeSynchronizer->To64BitUSec(client_receive_time, ntohl(reflectorPacket->send_time_data.integer));
+
+        timeData.internal_delay = (int64_t)(timeData.server_send_time - timeData.server_receive_time);
+        timeData.rtt = (int64_t)(client_receive_time - timeData.client_send_time);
+        timeData.client_server_delay = client_server_delay;
+        timeData.server_client_delay = server_client_delay;
     } else {
-        /* Compute timestamps in usec */
         auto client_timestamp = ntohts(reflectorPacket->client_time_data);
         auto server_timestamp = ntohts(reflectorPacket->server_time_data);
         auto send_timestamp = ntohts(reflectorPacket->send_time_data);
-        client_send_time = timestamp_to_usec(&client_timestamp);
-        server_receive_time = timestamp_to_usec(&server_timestamp);
-        server_send_time = timestamp_to_usec(&send_timestamp);
-        /* Compute delays */
-        internal_delay = server_send_time - server_receive_time;
-        client_server_delay = server_receive_time - client_send_time;
-        server_client_delay = client_receive_time - server_send_time;
-        rtt = client_receive_time - client_send_time;
+
+        timeData.client_send_time = timestamp_to_usec(&client_timestamp);
+        timeData.server_receive_time = timestamp_to_usec(&server_timestamp);
+        timeData.server_send_time = timestamp_to_usec(&send_timestamp);
+
+        timeData.internal_delay = timeData.server_send_time - timeData.server_receive_time;
+        timeData.client_server_delay = timeData.server_receive_time - timeData.client_send_time;
+        timeData.server_client_delay = client_receive_time - timeData.server_send_time;
+        timeData.rtt = client_receive_time - timeData.client_send_time;
     }
-    MetricData data;
+    return timeData;
+}
+
+void populateMetricData(MetricData &data, ReflectorPacket *reflectorPacket, const IPHeader &ipHeader, const std::string &host, uint16_t local_port, uint16_t port, ssize_t payload_len, uint16_t packet_loss, TimeData &timeData) {
     data.ip = host;
-    data.sending_port = std::stoi(args.local_port);
+    data.sending_port = local_port;
     data.receiving_port = port;
     data.packet = *reflectorPacket;
     data.ipHeader = ipHeader;
-    data.initial_send_time = client_send_time;
+    data.initial_send_time = timeData.client_send_time;
     data.payload_length = payload_len;
     data.packet_loss = packet_loss;
-    data.internal_delay = internal_delay;
-    data.server_client_delay = server_client_delay;
-    data.client_server_delay = client_server_delay;
-    data.rtt_delay = rtt;
+    data.internal_delay = timeData.internal_delay;
+    data.server_client_delay = timeData.server_client_delay;
+    data.client_server_delay = timeData.client_server_delay;
+    data.rtt_delay = timeData.rtt;
+}
 
-    struct timespec rtt_ts = {};
-    rtt_ts.tv_sec = rtt / 1000000;
-    rtt_ts.tv_nsec = (rtt % 1000000) * 1000;
-    // struct timespec internal_delay_ts = {};
-    // internal_delay_ts.tv_sec = internal_delay / 1000000;
-    // internal_delay_ts.tv_nsec = (internal_delay % 1000000) * 1000;
-    struct timespec client_server_delay_ts = {};
-    client_server_delay_ts.tv_sec = client_server_delay / 1000000;
-    client_server_delay_ts.tv_nsec = (client_server_delay % 1000000) * 1000;
-    struct timespec server_client_delay_ts = {};
-    server_client_delay_ts.tv_sec = server_client_delay / 1000000;
-    server_client_delay_ts.tv_nsec = (server_client_delay % 1000000) * 1000;
-    if (Client::first_packet_sent == 0) {
-        Client::first_packet_sent = client_send_time;
-    }
-    Client::last_packet_sent = client_send_time;
+struct timespec convertToTimespec(int64_t delay) {
+    struct timespec ts;
+    ts.tv_sec = delay / 1000000;
+    ts.tv_nsec = (delay % 1000000) * 1000;
+    return ts;
+}
+
+void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msghdr, ssize_t payload_len, uint16_t packet_loss) {
+    IPHeader ipHeader = get_ip_header(msghdr);
+    sockaddr_in *sock = ((sockaddr_in *)msghdr.msg_name);
+    std::string host = inet_ntoa(sock->sin_addr);
+    uint16_t local_port = atoi(args.local_port.c_str());
+    uint16_t  port = ntohs(sock->sin_port);
+    uint64_t client_receive_time = get_usec();
+
+    TimeData timeData = computeTimeData(args.sync_time, client_receive_time, reflectorPacket, timeSynchronizer);
+
+    MetricData data;
+    populateMetricData(data, reflectorPacket, ipHeader, host, local_port, port, payload_len, packet_loss, timeData);
+
+    struct timespec rtt_ts = convertToTimespec(timeData.rtt);
+    struct timespec client_server_delay_ts = convertToTimespec(timeData.client_server_delay);
+    struct timespec server_client_delay_ts = convertToTimespec(timeData.server_client_delay);
+
     sqa_stats_add_sample(Client::stats_RTT, &rtt_ts);
-    //sqa_stats_add_sample(Client::stats_internal, &internal_delay_ts);
     sqa_stats_add_sample(Client::stats_client_server, &client_server_delay_ts);
     sqa_stats_add_sample(Client::stats_server_client, &server_client_delay_ts);
+
+    if (Client::first_packet_sent == 0) {
+        Client::first_packet_sent = timeData.client_send_time;
+    }
+    Client::last_packet_sent = timeData.client_send_time;
+
     if (args.print_RTT_only) {
-        std::cout << std::fixed << (double) rtt / 1e6 << "\n";
+        std::cout << std::fixed << (double) timeData.rtt / 1e6 << "\n";
     } else {
         printMetrics(data);
     }

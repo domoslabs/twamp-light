@@ -6,7 +6,8 @@
 Args parse_args(int argc, char **argv){
     Args args;
     uint8_t tos = 0;
-    CLI::App app{"Twamp-Light implementation written by Domos."};
+    std::string title = "Twamp-Light implementation written by Domos. Version " + std::string(TWAMP_VERSION_TXT);
+    CLI::App app{title.c_str()};
     app.option_defaults()->always_capture_default(true);
     app.add_option("-a, --local_address", args.local_host, "The address to set up the local socket on. Auto-selects by default.");
     app.add_option("-P, --local_port", args.local_port, "The port to set up the local socket on.");
