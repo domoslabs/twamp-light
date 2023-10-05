@@ -388,7 +388,7 @@ nlohmann::json td_to_json(td_histogram_t *histogram) {
     return json;
 }
 
-void Client::printJsonLog() {
+void Client::JsonLog(std::string json_output_file) {
     nlohmann::json logData;
 
     logData["qualityattenuationaggregate"] = {
@@ -402,6 +402,8 @@ void Client::printJsonLog() {
         {"empirical_distribution", td_to_json(Client::stats_RTT->empirical_distribution)},
     };
 
-
-    std::cout << logData.dump(4) << std::endl;
+    //Dump data to file
+    std::ofstream file(json_output_file);
+    file << std::setw(4) << logData << std::endl;
+    file.close();
 }

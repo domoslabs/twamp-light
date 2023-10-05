@@ -43,6 +43,7 @@ Args parse_args(int argc, char **argv){
     app.add_option("-t, --timeout", args.timeout, "How long (in seconds) to wait for response before aborting.")->default_str(std::to_string(args.timeout));
     app.add_option("-s, --seed", args.seed, "Seed for the RNG. 0 means random.");
     app.add_flag("--print-digest{true}", args.print_digest, "Prints a statistical summary at the end.");
+    app.add_option("-j, --json-output", args.json_output_file, "Filename to dump json output to");
     app.add_option("--print-RTT-only", args.print_RTT_only, "Prints only the RTT values.");
     app.add_option("--sep", args.sep, "The separator to use in the output.");
     app.add_flag("--sync{true}", args.sync_time, "Disables time synchronization mechanism. Not RFC-compatible, so disable to make this work with other TWAMP implementations.");
@@ -116,6 +117,9 @@ int main(int argc, char **argv) {
     if (args.print_digest) {
         client.printStats(packets_sent);
     }
-    
+    if (!args.json_output_file.empty()) {
+        client.JsonLog(args.json_output_file);
+    }
+
     return 0;
 }

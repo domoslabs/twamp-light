@@ -28,6 +28,7 @@ struct Args {
     bool sync_time = false;
     bool print_digest = false;
     bool print_RTT_only = false;
+    std::string json_output_file;
 };
 struct MetricData {
     std::string ip;
@@ -53,7 +54,7 @@ public:
     void runSenderThread();
     int getSentPackets();
     void printHeader();
-    void printJsonLog();
+    void JsonLog(std::string filename);
 
 private:
     int fd = -1;
