@@ -1,10 +1,12 @@
 #!/bin/bash
-stdbuf -o0 ./twamp-light-server -P 4200 &> server_output.txt &
+set -e
+stdbuf -o0 ./twamp-light-server -n 10 -P 4200 &> server_output.txt &
 server_pid=$!
 sleep 1
-stdbuf -o0 ./twamp-light-client localhost:4200 &> client_output.txt
-sleep 1
-kill $server_pid
+stdbuf -o0 ./twamp-light-client -i 10 -n 10 localhost:4200 &> client_output.txt &
+client_pid=$!
+wait $client_pid
+if pgrep $server_pid; then pkill $server_pid; fi
 
 # Check if the server output is correct
 

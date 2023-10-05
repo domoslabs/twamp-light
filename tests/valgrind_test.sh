@@ -1,17 +1,17 @@
 #!/bin/bash
-
+set -e
 # Run Valgrind on the server and client, capturing the output
-valgrind --leak-check=full --log-file=server_valgrind_output.txt ./twamp-light-server -P 4200 &> /dev/null &
+valgrind --leak-check=full --log-file=server_valgrind_output.txt ./twamp-light-server -n 10 -P 4200 &> /dev/null &
 server_pid=$!
 
 sleep 1  # Allow the server to start up (adjust sleep duration as needed)
 
-valgrind --leak-check=full --log-file=client_valgrind_output.txt ./twamp-light-client localhost:4200 &> /dev/null  &
+valgrind --leak-check=full --log-file=client_valgrind_output.txt ./twamp-light-client -n 10 -i 10 localhost:4200 &> /dev/null  &
 client_pid=$!
 
 # Wait for the client and server to finish
 wait $client_pid
-kill $server_pid  # In case the server is still running
+if pgrep $server_pid; then pkill $server_pid; fi
 
 parse_valgrind_output() {
   local output_file=$1
