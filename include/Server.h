@@ -41,9 +41,9 @@ private:
     TimeSynchronizer* timeSynchronizer = new TimeSynchronizer();
 
     Args args;
-    void handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t payload_len);
+    void handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t payload_len, timespec *incoming_timestamp);
     void printMetrics(const MetricData& data);
-    ReflectorPacket craftReflectorPacket(ClientPacket *clientPacket, msghdr sender_msg);
+    ReflectorPacket craftReflectorPacket(ClientPacket *clientPacket, msghdr sender_msg, timespec *incoming_timestamp);
 };
 
 

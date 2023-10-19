@@ -11,23 +11,6 @@
 #include "Client.h"
 #include "CLI11.hpp"
 
-// Function to parse the IP:Port format
-bool parseIPPort(const std::string& input, std::string& ip, uint16_t& port) {
-    size_t colon_pos = input.find(':');
-    if (colon_pos == std::string::npos) return false;
-
-    ip = input.substr(0, colon_pos);
-    std::string port_str = input.substr(colon_pos + 1);
-
-    int tmpport = atoi(port_str.c_str());
-    if (tmpport > 0 && tmpport < 65536) {
-        port = (uint16_t)tmpport;
-        return true;
-    } else {
-        return false;
-    }
-}
-
 Args parse_args(int argc, char **argv){
     Args args;
     bool print_version=false;
@@ -45,6 +28,7 @@ Args parse_args(int argc, char **argv){
     app.add_flag("--print-digest{true}", args.print_digest, "Prints a statistical summary at the end.");
     app.add_option("-j, --json-output", args.json_output_file, "Filename to dump json output to");
     app.add_option("--print-RTT-only", args.print_RTT_only, "Prints only the RTT values.");
+    app.add_option("--print-format", args.print_format, "which format to print the output in. Can be 'legacy', 'raw', 'clockcorrected'")->default_str(args.print_format);
     app.add_option("--sep", args.sep, "The separator to use in the output.");
     app.add_flag("--sync{true}", args.sync_time, "Disables time synchronization mechanism. Not RFC-compatible, so disable to make this work with other TWAMP implementations.");
     app.add_option("-i, --mean_inter_packet_delay", args.mean_inter_packet_delay, "The mean inter-packet delay in milliseconds.")->default_str(std::to_string(args.mean_inter_packet_delay));
@@ -94,25 +78,20 @@ Args parse_args(int argc, char **argv){
 int main(int argc, char **argv) {
     Args args = parse_args(argc, argv);
     Client client = Client(args);
-    uint16_t lost_packets = 0;
     uint32_t index = 0;
-    time_t start_time = time(NULL);
-    time_t expected_time_of_last_packet_generation = start_time + args.num_samples * args.mean_inter_packet_delay / 1000;
-
     std::thread sender_thread(&Client::runSenderThread, &client);
+    std::thread collator_thread(&Client::runCollatorThread, &client);
     client.printHeader();
     //Parent does the packet collecting
-    time_t time_of_last_received_packet = time(NULL);
-    while ((time(NULL) < expected_time_of_last_packet_generation || time(NULL) - time_of_last_received_packet < args.timeout) && // timeout if no packet received for timeout seconds
-        (args.num_samples == 0 || index < args.num_samples * args.remote_hosts.size())) // run forever if num_samples is 0, otherwise run until num_samples is reached
+    while ((args.num_samples == 0 || index < args.num_samples * args.remote_hosts.size())) // run forever if num_samples is 0, otherwise run until num_samples is reached
     {
-        bool response = client.awaitResponse(lost_packets);
+        bool response = client.awaitAndHandleResponse();
         if (response){
-            time_of_last_received_packet = time(NULL);
             index++;
         }
     }
     sender_thread.join();
+    collator_thread.join();
     int packets_sent = client.getSentPackets();
     if (args.print_digest) {
         client.printStats(packets_sent);
