@@ -59,21 +59,26 @@ int Server::listen() {
             }
         }
         char buffer[sizeof(ClientPacket)]; //We should only be receiving test_packets
+        char control[1024];
         struct sockaddr src_addr{};
 
         struct iovec iov[1];
         iov[0].iov_base = buffer;
         iov[0].iov_len = sizeof(buffer);
 
+        timespec incoming_timestamp;
+        timespec *incoming_timestamp_ptr = &incoming_timestamp;
+
         struct msghdr message{};
         message.msg_name = &src_addr;
         message.msg_namelen = sizeof(src_addr);
         message.msg_iov = iov;
         message.msg_iovlen = 1;
-        message.msg_control = nullptr;
-        message.msg_controllen = 1;
+        message.msg_control = control;
+        message.msg_controllen = sizeof(control);
 
         ssize_t payload_len = recvmsg(fd, &message, 0);
+        get_kernel_timestamp(message, incoming_timestamp_ptr);
         if (payload_len == -1) {
             if(errno == 11){
                 std::cerr << "Socket timed out." << std::endl;
@@ -87,14 +92,14 @@ int Server::listen() {
             std::cout << "Datagram too large for buffer: truncated" << std::endl;
         } else {
             auto *rec = (ClientPacket *) buffer;
-            handleTestPacket(rec, message, payload_len);
+            handleTestPacket(rec, message, payload_len, incoming_timestamp_ptr);
         }
     }
     return 0;
 }
 
-void Server::handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t payload_len) {
-    ReflectorPacket reflector_packet = craftReflectorPacket(packet, sender_msg);
+void Server::handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t payload_len, timespec *incoming_timestamp) {
+    ReflectorPacket reflector_packet = craftReflectorPacket(packet, sender_msg, incoming_timestamp);
     sockaddr_in *sock = ((sockaddr_in *)sender_msg.msg_name);
     // Overwrite and reuse the sender message with our own data and send it back, instead of creating a new one.
     char* host = inet_ntoa(sock->sin_addr);
@@ -118,10 +123,10 @@ void Server::handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t pa
         Timestamp client_timestamp = ntohts(packet->send_time_data);
         Timestamp server_timestamp = ntohts(reflector_packet.server_time_data);
         Timestamp send_timestamp = ntohts(reflector_packet.send_time_data);
-        client_server_delay = (int64_t)(timestamp_to_usec(&server_timestamp)-timestamp_to_usec(&client_timestamp));
-        server_receive_time = timestamp_to_usec(&server_timestamp);
-        server_send_time = timestamp_to_usec(&send_timestamp);
-        initial_send_time = timestamp_to_usec(&client_timestamp);
+        client_server_delay = (int64_t)(timestamp_to_nsec(&server_timestamp)-timestamp_to_nsec(&client_timestamp));
+        server_receive_time = timestamp_to_nsec(&server_timestamp);
+        server_send_time = timestamp_to_nsec(&send_timestamp);
+        initial_send_time = timestamp_to_nsec(&client_timestamp);
     }
 
     /* Compute delays */
@@ -137,21 +142,22 @@ void Server::handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t pa
     data.initial_send_time = initial_send_time;
     data.ip = host;
     printMetrics(data);
-    msghdr message = sender_msg;
+    struct msghdr message = sender_msg;
 
     struct iovec iov[1];
-    iov[0].iov_base=&reflector_packet;
-    iov[0].iov_len=payload_len;
-    message.msg_iov=iov;
-    message.msg_iovlen=1;
-
-    if (sendmsg(fd,&message,0)==-1) {
+    iov[0].iov_base = &reflector_packet;
+    iov[0].iov_len = payload_len;
+    message.msg_iov = iov;
+    message.msg_iovlen = 1;
+    message.msg_control = nullptr;
+    message.msg_controllen = 0;  // Set the control buffer size
+    if (sendmsg(fd, &message, 0) == -1) {
         std::cerr << strerror(errno) << std::endl;
         return;
     }
 }
 
-ReflectorPacket Server::craftReflectorPacket(ClientPacket *clientPacket, msghdr sender_msg){
+ReflectorPacket Server::craftReflectorPacket(ClientPacket *clientPacket, msghdr sender_msg, timespec *incoming_timestamp){
 
     ReflectorPacket packet = {};
     if(args.sync_time){
@@ -160,7 +166,8 @@ ReflectorPacket Server::craftReflectorPacket(ClientPacket *clientPacket, msghdr 
         server_timestamp.fractional = timeSynchronizer->GetMinDeltaTS24().ToUnsigned();
         packet.server_time_data = htonts(server_timestamp);
     } else {
-        Timestamp server_timestamp = get_timestamp();
+        Timestamp server_timestamp;
+        timespec_to_timestamp(incoming_timestamp, &server_timestamp);
         packet.server_time_data = htonts(server_timestamp);
     }
     packet.seq_number = clientPacket->seq_number;
@@ -202,6 +209,6 @@ void Server::printMetrics(const MetricData& data) {
     }
     std::cout << std::fixed << client_send_time << args.sep << data.ip << args.sep << snd_nb << args.sep
               << rcv_nb << args.sep << data.sending_port << args.sep << data.receiving_port << args.sep << unsigned(data.packet.sender_ttl) << args.sep << unsigned(snd_tos) << args.sep
-              << unsigned(fw_tos) << args.sep << (double) data.internal_delay * 1e-3 << args.sep << (double) data.client_server_delay * 1e-3 << args.sep << std::to_string(data.payload_length) << "\n";
+              << unsigned(fw_tos) << args.sep << (double) data.internal_delay * 1e-6 << args.sep << (double) data.client_server_delay * 1e-6 << args.sep << std::to_string(data.payload_length) << "\n";
 
 }

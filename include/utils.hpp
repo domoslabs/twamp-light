@@ -26,16 +26,20 @@ typedef struct ip_header {
 
 
 void timeval_to_timestamp(const struct timeval *tv, Timestamp * ts);
+void timespec_to_timestamp(const struct timespec *tv, Timestamp *ts);
 
 void timestamp_to_timeval(const Timestamp * ts, struct timeval *tv);
 
 uint64_t timestamp_to_usec(const Timestamp * ts);
+uint64_t timestamp_to_nsec(const Timestamp * ts);
+struct timespec nanosecondsToTimespec(uint64_t delay_epoch_nanoseconds);
 uint64_t get_usec();
 Timestamp get_timestamp();
 
 IPHeader get_ip_header(msghdr message);
 void set_socket_options(int socket, uint8_t ip_ttl, uint8_t timeout_secs);
 void set_socket_tos(int socket, uint8_t ip_tos);
+void get_kernel_timestamp(msghdr message, timespec *ts);
 bool isWithinEpsilon(double a, double b, double percentEpsilon);
 template <class T>
 std::string vectorToString(std::vector<T> vec, std::string sep){
@@ -58,4 +62,5 @@ Iter select_randomly(Iter start, Iter end, uint32_t seed=0) {
 }
 Timestamp ntohts(Timestamp ts);
 Timestamp htonts(Timestamp ts);
+bool parseIPPort(const std::string& input, std::string& ip, uint16_t& port);
 #endif //DOMOS_TWAMP_LIGHT_TWAMP_LIGHT_HPP
