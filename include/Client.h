@@ -7,6 +7,7 @@
 
 #include <string>
 #include <vector>
+#include <queue>
 #include <semaphore.h>
 #include "utils.hpp"
 #include "TimeSync.h"
@@ -83,13 +84,10 @@ class Client {
     bool awaitAndHandleResponse();
     void printStats(int packets_sent);
     void printRawDataHeader();
-    void printDelayData();
     void aggregateRawData(RawData *oldest_raw_data);
-    void aggregateDelayData();
     void runSenderThread();
     void runReceiverThread();
     void runCollatorThread();
-    void addSentPacket(uint32_t packet_id, Timestamp send_time, uint16_t payload_len);
     void enqueue_observation(struct qed_observation *obs);
     void process_observation(struct qed_observation *obs);
     void check_if_oldest_packet_should_be_processed();
@@ -102,6 +100,7 @@ class Client {
     int fd = -1;
     int sent_packets = 0;
     int sending_completed = 0;
+    int collator_finished = 0;
     bool header_printed = false;
     sem_t observation_semaphore;
     pthread_mutex_t observation_list_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -113,7 +112,6 @@ class Client {
     struct sqa_stats *stats_client_server;
     struct sqa_stats *stats_server_client;
     struct RawDataList *raw_data_list;
-    struct DelayData **delay_data;
     uint64_t first_packet_sent_epoch_nanoseconds = 0;
     uint64_t last_packet_sent_epoch_nanoseconds = 0;
     uint64_t last_packet_received_epoch_nanoseconds = 0;

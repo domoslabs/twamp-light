@@ -80,21 +80,7 @@ Client::Client(const Args &args)
     stats_client_server = sqa_stats_create();
     stats_server_client = sqa_stats_create();
     // init the raw data array
-    raw_data_list = (struct RawDataList *) malloc(sizeof(struct RawDataList));
-    raw_data_list->oldest_entry = NULL;
-    raw_data_list->newest_entry = NULL;
-    raw_data_list->num_entries = 0;
-    // init the delay data array
-    delay_data = (struct DelayData **) malloc(args.num_samples * sizeof(struct DelayData *));
-    for (int i = 0; i < args.num_samples; i++) {
-        delay_data[i] = (struct DelayData *) malloc(sizeof(struct DelayData));
-        delay_data[i]->packet_id = i;
-        delay_data[i]->payload_len = 0;
-        delay_data[i]->packet_generated_timestamp = 0;
-        delay_data[i]->delay_to_server = 0;
-        delay_data[i]->delay_to_server_response = 0;
-        delay_data[i]->delay_round_trip = 0;
-    }
+    raw_data_list = new RawDataList();
 
     // Initialize the semaphore
     sem_init(&observation_semaphore, 0, 0);
@@ -116,41 +102,20 @@ Client::~Client()
     }
     free(observation_list);
     delete timeSynchronizer;
-    for (int i = 0; i < args.num_samples; i++) {
-        free(delay_data[i]);
-    }
-    free(raw_data_list);
-    free(delay_data);
+    delete raw_data_list;
     sem_destroy(&observation_semaphore);
 }
 
-uint32_t encode_observation_point(std::string observation_point)
-{
-    uint32_t retval = 0;
-    if (observation_point == "client_send_time") {
-        retval = 0;
-    } else if (observation_point == "server_receive_time") {
-        retval = 1;
-    } else if (observation_point == "server_send_time") {
-        retval = 2;
-    } else if (observation_point == "client_receive_time") {
-        retval = 3;
-    } else {
-        retval = 4;
-    }
-    return retval;
-}
-
-std::string decode_observation_point(uint32_t observation_point)
+std::string decode_observation_point(ObservationPoints observation_point)
 {
     std::string retval;
-    if (observation_point == 0) {
+    if (observation_point == ObservationPoints::CLIENT_SEND) {
         retval = "client_send_time";
-    } else if (observation_point == 1) {
+    } else if (observation_point == ObservationPoints::SERVER_RECEIVE) {
         retval = "server_receive_time";
-    } else if (observation_point == 2) {
+    } else if (observation_point == ObservationPoints::SERVER_SEND) {
         retval = "server_send_time";
-    } else if (observation_point == 3) {
+    } else if (observation_point == ObservationPoints::CLIENT_RECEIVE) {
         retval = "client_receive_time";
     } else {
         retval = "unknown";
@@ -158,11 +123,14 @@ std::string decode_observation_point(uint32_t observation_point)
     return retval;
 }
 
-struct qed_observation *make_qed_observation(
-    std::string observation_point, uint64_t epoch_nanoseconds, uint32_t packet_id, uint16_t payload_len, uint8_t tos)
+struct qed_observation *make_qed_observation(ObservationPoints observation_point,
+                                             uint64_t epoch_nanoseconds,
+                                             uint32_t packet_id,
+                                             uint16_t payload_len,
+                                             uint8_t tos)
 {
     struct qed_observation *obs = (struct qed_observation *) malloc(sizeof(struct qed_observation));
-    obs->observation_point = encode_observation_point(observation_point);
+    obs->observation_point = observation_point;
     obs->epoch_nanoseconds = epoch_nanoseconds;
     obs->packet_id = packet_id;
     obs->payload_len = payload_len;
@@ -185,8 +153,11 @@ void Client::runSenderThread()
             first_packet_sent_epoch_nanoseconds = timestamp_to_nsec(&sent_time);
         }
         last_packet_sent_epoch_nanoseconds = timestamp_to_nsec(&sent_time);
-        struct qed_observation *obs =
-            make_qed_observation("client_send_time", timestamp_to_nsec(&sent_time), index, payload_len, args.snd_tos);
+        struct qed_observation *obs = make_qed_observation(ObservationPoints::CLIENT_SEND,
+                                                           timestamp_to_nsec(&sent_time),
+                                                           index,
+                                                           payload_len,
+                                                           args.snd_tos);
         enqueue_observation(obs);
         index++;
         usleep(delay);
@@ -237,33 +208,26 @@ void Client::process_observation(struct qed_observation *obs)
     }
     if (entry == NULL) {
         // Didn't find the entry, so create a new one
-        entry = (struct RawData *) malloc(sizeof(struct RawData));
-        entry->next = NULL;
-        entry->prev = NULL;
+        entry = new RawData();
         Timestamp now_ts = get_timestamp();
         entry->added_at_epoch_nanoseconds = timestamp_to_nsec(&now_ts);
         entry->packet_id = obs->packet_id;
-        entry->payload_len = obs->payload_len;
-        entry->client_send_epoch_nanoseconds = 0;
-        entry->server_receive_epoch_nanoseconds = 0;
-        entry->server_send_epoch_nanoseconds = 0;
-        entry->client_receive_epoch_nanoseconds = 0;
         made_new_entry = 1;
         // Add the entry to the raw_data list
     }
     // Update the entry with the observation data
     entry->payload_len = obs->payload_len;
     switch (obs->observation_point) {
-    case 0:
+    case ObservationPoints::CLIENT_SEND:
         entry->client_send_epoch_nanoseconds = obs->epoch_nanoseconds;
         break;
-    case 1:
+    case ObservationPoints::SERVER_RECEIVE:
         entry->server_receive_epoch_nanoseconds = obs->epoch_nanoseconds;
         break;
-    case 2:
+    case ObservationPoints::SERVER_SEND:
         entry->server_send_epoch_nanoseconds = obs->epoch_nanoseconds;
         break;
-    case 3:
+    case ObservationPoints::CLIENT_RECEIVE:
         entry->client_receive_epoch_nanoseconds = obs->epoch_nanoseconds;
         break;
     default:
@@ -322,13 +286,13 @@ void Client::check_if_oldest_packet_should_be_processed()
                 raw_data_list->newest_entry = NULL;
             }
             raw_data_list->num_entries--;
-            free(oldest_raw_data);
+            delete oldest_raw_data;
         }
     }
     if (raw_data_list->num_entries == 0 && sending_completed == 1) {
         // All the packets have been sent and all the responses have been received or timed out
         // Close the thread
-        pthread_exit(NULL);
+        collator_finished = 1;
     }
 }
 
@@ -337,8 +301,8 @@ void Client::runCollatorThread()
 {
     // Consumes the observation queue and generates a table.
     // Uses semaphore to wake the thread only when there are observations to consume.
-    while (1) {
-        struct qed_observation tmp_obs = {0};
+    while (collator_finished == 0) {
+        struct qed_observation tmp_obs = {};
         struct qed_observation *tmp_obs_ptr = &tmp_obs;
 
         if (sem_trywait(&observation_semaphore) == 0) {
@@ -366,19 +330,6 @@ void Client::printRawDataHeader()
               << "server_receive_epoch_nanoseconds" << args.sep << "server_send_epoch_nanoseconds" << args.sep
               << "client_receive_epoch_nanoseconds"
               << "\n";
-}
-
-void Client::printDelayData()
-{
-    // Print a header
-    std::cout << "packet_id" << args.sep << "payload_len" << args.sep << "packet_generated_timestamp" << args.sep
-              << "delay_to_server" << args.sep << "delay_to_server_response" << args.sep << "delay_round_trip"
-              << "\n";
-    for (int i = 0; i < args.num_samples; i++) {
-        std::cout << delay_data[i]->packet_id << args.sep << delay_data[i]->payload_len << args.sep
-                  << delay_data[i]->packet_generated_timestamp << args.sep << delay_data[i]->delay_to_server << args.sep
-                  << delay_data[i]->delay_to_server_response << args.sep << delay_data[i]->delay_round_trip << "\n";
-    }
 }
 
 int64_t calculate_correction(RawData **first_entry, RawData **last_entry)
@@ -442,57 +393,6 @@ void Client::aggregateRawData(RawData *oldest_raw_data)
     sqa_stats_add_sample(stats_RTT, &rtt_delay);
 }
 
-void Client::aggregateDelayData()
-{
-    // Parse the delay data into aggregate stats
-    for (int i = 0; i < args.num_samples; i++) {
-        if (delay_data[i]->delay_round_trip != 0) {
-            sqa_stats_add_sample_nsec(stats_RTT, delay_data[i]->delay_round_trip);
-        } else {
-            sqa_stats_count_loss(stats_RTT);
-        }
-        if (delay_data[i]->delay_to_server != 0) {
-            sqa_stats_add_sample_nsec(stats_client_server, delay_data[i]->delay_to_server);
-        } else {
-            sqa_stats_count_loss(stats_client_server);
-        }
-        if (delay_data[i]->delay_to_server_response != 0 && delay_data[i]->delay_to_server != 0) {
-            sqa_stats_add_sample_nsec(stats_internal,
-                                      delay_data[i]->delay_to_server_response - delay_data[i]->delay_to_server);
-        } else {
-            sqa_stats_count_loss(stats_internal);
-        }
-        if (delay_data[i]->delay_round_trip != 0 && delay_data[i]->delay_to_server_response != 0) {
-            sqa_stats_add_sample_nsec(stats_server_client,
-                                      delay_data[i]->delay_round_trip - delay_data[i]->delay_to_server_response);
-        } else {
-            sqa_stats_count_loss(stats_server_client);
-        }
-    }
-}
-
-void Client::addSentPacket(uint32_t packet_id, Timestamp send_time, uint16_t payload_len)
-{
-    struct qed_observation *obs =
-        make_qed_observation("client_send_time", timestamp_to_nsec(&send_time), packet_id, payload_len, args.snd_tos);
-    struct observation_list_entry *observation_list_entry =
-        (struct observation_list_entry *) malloc(sizeof(struct observation_list_entry));
-    observation_list_entry->observation = obs;
-    observation_list_entry->next = NULL;
-    // Lock the sender mutex
-    pthread_mutex_lock(&observation_list_mutex);
-    if (observation_list->first == NULL) {
-        observation_list->first = observation_list_entry;
-        observation_list->last = observation_list_entry;
-    } else {
-        observation_list->last->next = observation_list_entry;
-        observation_list->last = observation_list_entry;
-    }
-    // Add to the semaphore
-    sem_post(&observation_semaphore);
-    pthread_mutex_unlock(&observation_list_mutex);
-}
-
 int Client::getSentPackets()
 {
     return sent_packets;
@@ -554,13 +454,7 @@ bool Client::awaitAndHandleResponse()
     timespec incoming_timestamp;
     timespec *incoming_timestamp_ptr = &incoming_timestamp;
 
-    struct msghdr incoming_msg {};
-    incoming_msg.msg_name = &src_addr;
-    incoming_msg.msg_namelen = sizeof(src_addr);
-    incoming_msg.msg_iov = &iov;
-    incoming_msg.msg_iovlen = 1;
-    incoming_msg.msg_control = control;
-    incoming_msg.msg_controllen = sizeof(control);
+    struct msghdr incoming_msg = make_msghdr(&iov, 1, &src_addr, sizeof(src_addr), control, sizeof(control));
 
     ssize_t count = recvmsg(fd, &incoming_msg, MSG_WAITALL);
     get_kernel_timestamp(incoming_msg, incoming_timestamp_ptr);
@@ -703,20 +597,26 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket,
     // uint16_t local_port = atoi(args.local_port.c_str());
     uint32_t packet_id = ntohl(reflectorPacket->seq_number);
 
-    struct qed_observation *obs1 =
-        make_qed_observation("client_receive_time", incoming_timestamp_nanoseconds, packet_id, payload_len, tos);
-    struct qed_observation *obs2 = make_qed_observation("server_receive_time",
+    struct qed_observation *obs1 = make_qed_observation(ObservationPoints::CLIENT_RECEIVE,
+                                                        incoming_timestamp_nanoseconds,
+                                                        packet_id,
+                                                        payload_len,
+                                                        tos);
+    struct qed_observation *obs2 = make_qed_observation(ObservationPoints::SERVER_RECEIVE,
                                                         timestamp_to_nsec(&server_receive_time),
                                                         packet_id,
                                                         payload_len,
                                                         tos);
-    struct qed_observation *obs3 =
-        make_qed_observation("server_send_time", timestamp_to_nsec(&server_send_time), packet_id, payload_len, tos);
+    struct qed_observation *obs3 = make_qed_observation(ObservationPoints::SERVER_SEND,
+                                                        timestamp_to_nsec(&server_send_time),
+                                                        packet_id,
+                                                        payload_len,
+                                                        tos);
 
     // Queue all observations in the FIFO to the collator
-    enqueue_observation(obs1);
-    enqueue_observation(obs2);
     enqueue_observation(obs3);
+    enqueue_observation(obs2);
+    enqueue_observation(obs1);
     if (args.print_format == "legacy") {
         printReflectorPacket(reflectorPacket, msghdr, payload_len, incoming_timestamp);
     }

@@ -1,7 +1,9 @@
 #include <stdint.h>
 
+enum class ObservationPoints { CLIENT_SEND, SERVER_RECEIVE, SERVER_SEND, CLIENT_RECEIVE, NUM_OBSERVATION_POINTS };
+
 struct qed_observation {
-    uint32_t observation_point;
+    ObservationPoints observation_point;
     uint64_t epoch_nanoseconds;
     uint32_t packet_id;
     uint16_t payload_len;

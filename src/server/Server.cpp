@@ -73,13 +73,7 @@ int Server::listen()
         timespec incoming_timestamp;
         timespec *incoming_timestamp_ptr = &incoming_timestamp;
 
-        struct msghdr message {};
-        message.msg_name = &src_addr;
-        message.msg_namelen = sizeof(src_addr);
-        message.msg_iov = iov;
-        message.msg_iovlen = 1;
-        message.msg_control = control;
-        message.msg_controllen = sizeof(control);
+        struct msghdr message = make_msghdr(iov, 1, &src_addr, sizeof(src_addr), control, sizeof(control));
 
         ssize_t payload_len = recvmsg(fd, &message, 0);
         get_kernel_timestamp(message, incoming_timestamp_ptr);

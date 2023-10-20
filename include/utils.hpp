@@ -62,4 +62,6 @@ template <typename Iter> Iter select_randomly(Iter start, Iter end, uint32_t see
 Timestamp ntohts(Timestamp ts);
 Timestamp htonts(Timestamp ts);
 bool parseIPPort(const std::string &input, std::string &ip, uint16_t &port);
+struct msghdr make_msghdr(
+    struct iovec *iov, size_t iov_len, struct sockaddr *addr, socklen_t addr_len, char *control, size_t control_len);
 #endif // DOMOS_TWAMP_LIGHT_TWAMP_LIGHT_HPP

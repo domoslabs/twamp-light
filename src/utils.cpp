@@ -308,3 +308,16 @@ bool parseIPPort(const std::string &input, std::string &ip, uint16_t &port)
         return false;
     }
 }
+
+struct msghdr make_msghdr(
+    struct iovec *iov, size_t iov_len, struct sockaddr *addr, socklen_t addr_len, char *control, size_t control_len)
+{
+    struct msghdr message = {};
+    message.msg_name = addr;
+    message.msg_namelen = addr_len;
+    message.msg_iov = iov;
+    message.msg_iovlen = iov_len;
+    message.msg_control = control;
+    message.msg_controllen = control_len;
+    return message;
+}

@@ -99,12 +99,10 @@ int main(int argc, char **argv)
     Client client = Client(args);
     std::thread receiver_thread(&Client::runReceiverThread, &client);
     std::thread sender_thread(&Client::runSenderThread, &client);
-    std::thread collator_thread(&Client::runCollatorThread, &client);
     client.printHeader();
-
+    client.runCollatorThread();
     sender_thread.join();
     receiver_thread.join();
-    collator_thread.join();
     int packets_sent = client.getSentPackets();
     if (args.print_digest) {
         client.printStats(packets_sent);
