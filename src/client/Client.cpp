@@ -19,43 +19,48 @@
 
 using Clock = std::chrono::system_clock;
 
-
-Client::Client(const Args& args) {
+Client::Client(const Args &args)
+{
     this->args = args;
     // Construct remote socket address
-    struct addrinfo hints{};
-    memset(&hints,0,sizeof(hints));
-    hints.ai_family=AF_INET; //TODO IPv6
-    hints.ai_socktype=SOCK_DGRAM;
-    hints.ai_protocol=0;
-    hints.ai_flags=AI_PASSIVE|AI_ADDRCONFIG;
+    struct addrinfo hints {};
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET; // TODO IPv6
+    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_protocol = 0;
+    hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
     // Resize the remote_address_info vector based on the number of remote hosts
     remote_address_info.resize(args.remote_hosts.size());
     int i = 0;
-    for (const auto& remote_host : args.remote_hosts) {
+    for (const auto &remote_host : args.remote_hosts) {
         std::string port;
         try {
             // Convert port number to string
             port = std::to_string(args.remote_ports.at(i));
-        } catch (std::out_of_range& e) {
+        } catch (std::out_of_range &e) {
             std::cerr << "Not enough remote ports provided" << std::endl;
             std::exit(EXIT_FAILURE);
         }
-        int err=getaddrinfo(remote_host.c_str(), port.c_str(), &hints, &remote_address_info[i]);
-        if (err!=0) {
+        int err = getaddrinfo(remote_host.c_str(), port.c_str(), &hints, &remote_address_info[i]);
+        if (err != 0) {
             std::cerr << "failed to resolve remote socket address: " << err;
             std::exit(EXIT_FAILURE);
         }
         i++;
     }
-    int err2=getaddrinfo(args.local_host.empty()? nullptr : args.local_host.c_str(), args.local_port.c_str(),&hints,&local_address_info);
-    if (err2!=0) {
+    int err2 = getaddrinfo(args.local_host.empty() ? nullptr : args.local_host.c_str(),
+                           args.local_port.c_str(),
+                           &hints,
+                           &local_address_info);
+    if (err2 != 0) {
         std::cerr << "failed to resolve local socket address: " << err2;
         std::exit(EXIT_FAILURE);
     }
     // Create the socket
-    fd=socket(remote_address_info[0]->ai_family, remote_address_info[0]->ai_socktype, remote_address_info[0]->ai_protocol);
-    if (fd==-1) {
+    fd = socket(remote_address_info[0]->ai_family,
+                remote_address_info[0]->ai_socktype,
+                remote_address_info[0]->ai_protocol);
+    if (fd == -1) {
         std::cerr << strerror(errno) << std::endl;
         throw;
     }
@@ -75,14 +80,14 @@ Client::Client(const Args& args) {
     stats_client_server = sqa_stats_create();
     stats_server_client = sqa_stats_create();
     // init the raw data array
-    raw_data_list = (struct RawDataList*)malloc(sizeof(struct RawDataList));
+    raw_data_list = (struct RawDataList *) malloc(sizeof(struct RawDataList));
     raw_data_list->oldest_entry = NULL;
     raw_data_list->newest_entry = NULL;
     raw_data_list->num_entries = 0;
     // init the delay data array
-    delay_data = (struct DelayData**)malloc(args.num_samples * sizeof(struct DelayData*));
+    delay_data = (struct DelayData **) malloc(args.num_samples * sizeof(struct DelayData *));
     for (int i = 0; i < args.num_samples; i++) {
-        delay_data[i] = (struct DelayData*)malloc(sizeof(struct DelayData));
+        delay_data[i] = (struct DelayData *) malloc(sizeof(struct DelayData));
         delay_data[i]->packet_id = i;
         delay_data[i]->payload_len = 0;
         delay_data[i]->packet_generated_timestamp = 0;
@@ -95,17 +100,18 @@ Client::Client(const Args& args) {
     sem_init(&observation_semaphore, 0, 0);
 }
 
-Client::~Client() {
+Client::~Client()
+{
     sqa_stats_destroy(stats_RTT);
     sqa_stats_destroy(stats_internal);
     sqa_stats_destroy(stats_client_server);
     sqa_stats_destroy(stats_server_client);
-    for( auto& addrinfo : remote_address_info) {
-        if (addrinfo!=NULL) {
+    for (auto &addrinfo : remote_address_info) {
+        if (addrinfo != NULL) {
             freeaddrinfo(addrinfo);
         }
     }
-    if (local_address_info!=NULL) {
+    if (local_address_info != NULL) {
         freeaddrinfo(local_address_info);
     }
     free(observation_list);
@@ -118,7 +124,8 @@ Client::~Client() {
     sem_destroy(&observation_semaphore);
 }
 
-uint32_t encode_observation_point(std::string observation_point) {
+uint32_t encode_observation_point(std::string observation_point)
+{
     uint32_t retval = 0;
     if (observation_point == "client_send_time") {
         retval = 0;
@@ -134,7 +141,8 @@ uint32_t encode_observation_point(std::string observation_point) {
     return retval;
 }
 
-std::string decode_observation_point(uint32_t observation_point) {
+std::string decode_observation_point(uint32_t observation_point)
+{
     std::string retval;
     if (observation_point == 0) {
         retval = "client_send_time";
@@ -150,8 +158,10 @@ std::string decode_observation_point(uint32_t observation_point) {
     return retval;
 }
 
-struct qed_observation * make_qed_observation(std::string observation_point, uint64_t epoch_nanoseconds, uint32_t packet_id, uint16_t payload_len, uint8_t tos) {
-    struct qed_observation *obs = (struct qed_observation*)malloc(sizeof(struct qed_observation));
+struct qed_observation *make_qed_observation(
+    std::string observation_point, uint64_t epoch_nanoseconds, uint32_t packet_id, uint16_t payload_len, uint8_t tos)
+{
+    struct qed_observation *obs = (struct qed_observation *) malloc(sizeof(struct qed_observation));
     obs->observation_point = encode_observation_point(observation_point);
     obs->epoch_nanoseconds = epoch_nanoseconds;
     obs->packet_id = packet_id;
@@ -159,20 +169,24 @@ struct qed_observation * make_qed_observation(std::string observation_point, uin
     return obs;
 }
 
-void Client::runSenderThread() {
+/* The packet generation function */
+void Client::runSenderThread()
+{
     uint32_t index = 0;
-    std::random_device rd;  //Will be used to obtain a seed for the random number engine
-    std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
-    std::exponential_distribution<> d(1.0/(args.mean_inter_packet_delay*1000)); //Lambda is 1.0/mean (in microseconds)
+    std::random_device rd;  // Will be used to obtain a seed for the random number engine
+    std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
+    std::exponential_distribution<> d(1.0 /
+                                      (args.mean_inter_packet_delay * 1000)); // Lambda is 1.0/mean (in microseconds)
     while (args.num_samples == 0 || index < args.num_samples) {
         size_t payload_len = *select_randomly(args.payload_lens.begin(), args.payload_lens.end(), args.seed);
-        int delay = std::max((double)std::min((double)d(gen), 10000000.0), 0.0);
+        int delay = std::max((double) std::min((double) d(gen), 10000000.0), 0.0);
         Timestamp sent_time = sendPacket(index, payload_len);
         if (first_packet_sent_epoch_nanoseconds == 0) {
             first_packet_sent_epoch_nanoseconds = timestamp_to_nsec(&sent_time);
         }
         last_packet_sent_epoch_nanoseconds = timestamp_to_nsec(&sent_time);
-        struct qed_observation *obs = make_qed_observation("client_send_time", timestamp_to_nsec(&sent_time), index, payload_len, args.snd_tos);
+        struct qed_observation *obs =
+            make_qed_observation("client_send_time", timestamp_to_nsec(&sent_time), index, payload_len, args.snd_tos);
         enqueue_observation(obs);
         index++;
         usleep(delay);
@@ -181,15 +195,33 @@ void Client::runSenderThread() {
     sending_completed = 1;
 }
 
+/* Receives and processes the reflected
+    packets from the server side.*/
+void Client::runReceiverThread()
+{
+    uint32_t index = 0;
+    while ((args.num_samples == 0 ||
+            index < args.num_samples *
+                        args.remote_hosts
+                            .size())) // run forever if num_samples is 0, otherwise run until num_samples is reached
+    {
+        bool response = awaitAndHandleResponse();
+        if (response) {
+            index++;
+        }
+    }
+}
+
 // void Client::print_observation(struct qed_observation *obs) {
 //     //Print all the observation info
-//     std::cout << obs->epoch_nanoseconds << args.sep 
-//     << decode_observation_point(obs->observation_point) << args.sep 
+//     std::cout << obs->epoch_nanoseconds << args.sep
+//     << decode_observation_point(obs->observation_point) << args.sep
 //     << obs->packet_id << args.sep
 //     << obs->payload_len << "\n";
 // }
 
-void Client::process_observation(struct qed_observation *obs) {
+void Client::process_observation(struct qed_observation *obs)
+{
 
     // Look for the observation in the raw_data list
     RawData *entry = NULL;
@@ -205,7 +237,7 @@ void Client::process_observation(struct qed_observation *obs) {
     }
     if (entry == NULL) {
         // Didn't find the entry, so create a new one
-        entry = (struct RawData*)malloc(sizeof(struct RawData));
+        entry = (struct RawData *) malloc(sizeof(struct RawData));
         entry->next = NULL;
         entry->prev = NULL;
         Timestamp now_ts = get_timestamp();
@@ -221,8 +253,7 @@ void Client::process_observation(struct qed_observation *obs) {
     }
     // Update the entry with the observation data
     entry->payload_len = obs->payload_len;
-    switch (obs->observation_point)
-    {
+    switch (obs->observation_point) {
     case 0:
         entry->client_send_epoch_nanoseconds = obs->epoch_nanoseconds;
         break;
@@ -254,30 +285,30 @@ void Client::process_observation(struct qed_observation *obs) {
     }
 }
 
-void Client::check_if_oldest_packet_should_be_processed() {
+void Client::check_if_oldest_packet_should_be_processed()
+{
     // Check the timestamp on the oldest entry in raw_data and print it if it is old enough
     RawData *oldest_raw_data = raw_data_list->oldest_entry;
     Timestamp now = get_timestamp();
     uint64_t now_nanoseconds = timestamp_to_nsec(&now);
     int oldest_entry_is_complete = 0;
-    if (oldest_raw_data != NULL && 
-        oldest_raw_data->client_send_epoch_nanoseconds > 0 &&
-        oldest_raw_data->server_receive_epoch_nanoseconds > 0 &&
-        oldest_raw_data->server_send_epoch_nanoseconds > 0 &&
+    if (oldest_raw_data != NULL && oldest_raw_data->client_send_epoch_nanoseconds > 0 &&
+        oldest_raw_data->server_receive_epoch_nanoseconds > 0 && oldest_raw_data->server_send_epoch_nanoseconds > 0 &&
         oldest_raw_data->client_receive_epoch_nanoseconds > 0) {
         oldest_entry_is_complete = 1;
     }
-    if (oldest_raw_data != NULL && (oldest_entry_is_complete > 0 ||  (now_nanoseconds - oldest_raw_data->added_at_epoch_nanoseconds) > args.timeout * 1000000000)) {
+    if (oldest_raw_data != NULL &&
+        (oldest_entry_is_complete > 0 ||
+         (now_nanoseconds - oldest_raw_data->added_at_epoch_nanoseconds) > args.timeout * 1000000000)) {
         // The oldest entry is old enough to be processed
         aggregateRawData(oldest_raw_data);
 
         if (args.print_format == "raw") {
-            std::cout << oldest_raw_data->packet_id << args.sep
-                << oldest_raw_data->payload_len << args.sep
-                << oldest_raw_data->client_send_epoch_nanoseconds << args.sep
-                << oldest_raw_data->server_receive_epoch_nanoseconds << args.sep
-                << oldest_raw_data->server_send_epoch_nanoseconds << args.sep
-                << oldest_raw_data->client_receive_epoch_nanoseconds << "\n";
+            std::cout << oldest_raw_data->packet_id << args.sep << oldest_raw_data->payload_len << args.sep
+                      << oldest_raw_data->client_send_epoch_nanoseconds << args.sep
+                      << oldest_raw_data->server_receive_epoch_nanoseconds << args.sep
+                      << oldest_raw_data->server_send_epoch_nanoseconds << args.sep
+                      << oldest_raw_data->client_receive_epoch_nanoseconds << "\n";
         }
         // Remove the oldest entry from the raw_data list
         if (raw_data_list->num_entries > 0) {
@@ -301,10 +332,12 @@ void Client::check_if_oldest_packet_should_be_processed() {
     }
 }
 
-void Client::runCollatorThread() {
+/* Processes observations recorded by the sender and the receiver */
+void Client::runCollatorThread()
+{
     // Consumes the observation queue and generates a table.
     // Uses semaphore to wake the thread only when there are observations to consume.
-    while(1) {
+    while (1) {
         struct qed_observation tmp_obs = {0};
         struct qed_observation *tmp_obs_ptr = &tmp_obs;
 
@@ -326,35 +359,30 @@ void Client::runCollatorThread() {
     }
 }
 
-void Client::printRawDataHeader() {
-    //Print a header
-    std::cout << "packet_id" << args.sep
-    << "payload_len" << args.sep
-    << "client_send_epoch_nanoseconds" << args.sep
-    << "server_receive_epoch_nanoseconds" << args.sep
-    << "server_send_epoch_nanoseconds" << args.sep
-    << "client_receive_epoch_nanoseconds" << "\n";
+void Client::printRawDataHeader()
+{
+    // Print a header
+    std::cout << "packet_id" << args.sep << "payload_len" << args.sep << "client_send_epoch_nanoseconds" << args.sep
+              << "server_receive_epoch_nanoseconds" << args.sep << "server_send_epoch_nanoseconds" << args.sep
+              << "client_receive_epoch_nanoseconds"
+              << "\n";
 }
 
-void Client::printDelayData() {
-    //Print a header
-    std::cout << "packet_id" << args.sep
-    << "payload_len" << args.sep
-    << "packet_generated_timestamp" << args.sep
-    << "delay_to_server" << args.sep
-    << "delay_to_server_response" << args.sep
-    << "delay_round_trip" << "\n";
+void Client::printDelayData()
+{
+    // Print a header
+    std::cout << "packet_id" << args.sep << "payload_len" << args.sep << "packet_generated_timestamp" << args.sep
+              << "delay_to_server" << args.sep << "delay_to_server_response" << args.sep << "delay_round_trip"
+              << "\n";
     for (int i = 0; i < args.num_samples; i++) {
-        std::cout << delay_data[i]->packet_id << args.sep
-        << delay_data[i]->payload_len << args.sep
-        << delay_data[i]->packet_generated_timestamp << args.sep
-        << delay_data[i]->delay_to_server << args.sep
-        << delay_data[i]->delay_to_server_response << args.sep
-        << delay_data[i]->delay_round_trip << "\n";
+        std::cout << delay_data[i]->packet_id << args.sep << delay_data[i]->payload_len << args.sep
+                  << delay_data[i]->packet_generated_timestamp << args.sep << delay_data[i]->delay_to_server << args.sep
+                  << delay_data[i]->delay_to_server_response << args.sep << delay_data[i]->delay_round_trip << "\n";
     }
 }
 
-int64_t calculate_correction(RawData **first_entry, RawData **last_entry) {
+int64_t calculate_correction(RawData **first_entry, RawData **last_entry)
+{
     // Naive implementation that assumes no clock drift and symmetrical links
     int64_t min_fwd = INT64_MAX;
     int64_t min_bwd = INT64_MAX;
@@ -375,29 +403,29 @@ int64_t calculate_correction(RawData **first_entry, RawData **last_entry) {
     uint64_t corrected_min_owd = (min_fwd + min_bwd) / 2;
     // If the server side clock is ahead of the client side clock, fwd will appear too large and bwd will appear too small.
     // If the server side clock is behind the client side clock, fwd will appear too small and bwd will appear too large.
-    // The equation we need to solve is: 
+    // The equation we need to solve is:
     // fwd = bwd = rtt/2
     // (server_receive + correction) - client_send = client_receive - (server_send + correction) = rtt/2
     int64_t correction = corrected_min_owd - min_fwd;
     return correction;
 }
 
-void Client::aggregateRawData(RawData *oldest_raw_data) {
+void Client::aggregateRawData(RawData *oldest_raw_data)
+{
     // Compute the delays (without clock correction), and add them to the sqa_stats
     timespec client_server_delay = {0};
-    if (oldest_raw_data->client_send_epoch_nanoseconds > 0 && 
-        oldest_raw_data->server_receive_epoch_nanoseconds > 0) {
-        client_server_delay = nanosecondsToTimespec(oldest_raw_data->server_receive_epoch_nanoseconds - oldest_raw_data->client_send_epoch_nanoseconds);
+    if (oldest_raw_data->client_send_epoch_nanoseconds > 0 && oldest_raw_data->server_receive_epoch_nanoseconds > 0) {
+        client_server_delay = nanosecondsToTimespec(oldest_raw_data->server_receive_epoch_nanoseconds -
+                                                    oldest_raw_data->client_send_epoch_nanoseconds);
         sqa_stats_add_sample(stats_client_server, &client_server_delay);
     }
     timespec server_client_delay = {0};
-    if (oldest_raw_data->server_send_epoch_nanoseconds > 0 && 
-        oldest_raw_data->client_receive_epoch_nanoseconds > 0 && 
-        oldest_raw_data->server_receive_epoch_nanoseconds > 0 && 
-        oldest_raw_data->client_send_epoch_nanoseconds > 0) {
-        server_client_delay = nanosecondsToTimespec(oldest_raw_data->client_receive_epoch_nanoseconds - oldest_raw_data->server_send_epoch_nanoseconds);
+    if (oldest_raw_data->server_send_epoch_nanoseconds > 0 && oldest_raw_data->client_receive_epoch_nanoseconds > 0 &&
+        oldest_raw_data->server_receive_epoch_nanoseconds > 0 && oldest_raw_data->client_send_epoch_nanoseconds > 0) {
+        server_client_delay = nanosecondsToTimespec(oldest_raw_data->client_receive_epoch_nanoseconds -
+                                                    oldest_raw_data->server_send_epoch_nanoseconds);
         sqa_stats_add_sample(stats_server_client, &server_client_delay);
-    } else{
+    } else {
         // We don't know where the packet was lost, so update all loss counters
         sqa_stats_count_loss(stats_client_server);
         sqa_stats_count_loss(stats_internal);
@@ -406,16 +434,16 @@ void Client::aggregateRawData(RawData *oldest_raw_data) {
     }
     timespec internal_delay;
     timespec rtt_delay;
-    
+
     tspecminus(&server_client_delay, &client_server_delay, &internal_delay);
     sqa_stats_add_sample(stats_internal, &internal_delay);
 
     tspecplus(&client_server_delay, &server_client_delay, &rtt_delay);
     sqa_stats_add_sample(stats_RTT, &rtt_delay);
-
 }
 
-void Client::aggregateDelayData() {
+void Client::aggregateDelayData()
+{
     // Parse the delay data into aggregate stats
     for (int i = 0; i < args.num_samples; i++) {
         if (delay_data[i]->delay_round_trip != 0) {
@@ -429,26 +457,31 @@ void Client::aggregateDelayData() {
             sqa_stats_count_loss(stats_client_server);
         }
         if (delay_data[i]->delay_to_server_response != 0 && delay_data[i]->delay_to_server != 0) {
-            sqa_stats_add_sample_nsec(stats_internal, delay_data[i]->delay_to_server_response - delay_data[i]->delay_to_server);
+            sqa_stats_add_sample_nsec(stats_internal,
+                                      delay_data[i]->delay_to_server_response - delay_data[i]->delay_to_server);
         } else {
             sqa_stats_count_loss(stats_internal);
         }
         if (delay_data[i]->delay_round_trip != 0 && delay_data[i]->delay_to_server_response != 0) {
-            sqa_stats_add_sample_nsec(stats_server_client, delay_data[i]->delay_round_trip - delay_data[i]->delay_to_server_response);
+            sqa_stats_add_sample_nsec(stats_server_client,
+                                      delay_data[i]->delay_round_trip - delay_data[i]->delay_to_server_response);
         } else {
             sqa_stats_count_loss(stats_server_client);
         }
     }
 }
 
-void Client::addSentPacket(uint32_t packet_id, Timestamp send_time, uint16_t payload_len) {
-    struct qed_observation *obs = make_qed_observation("client_send_time", timestamp_to_nsec(&send_time), packet_id, payload_len, args.snd_tos);
-    struct observation_list_entry *observation_list_entry = (struct observation_list_entry*)malloc(sizeof(struct observation_list_entry));
+void Client::addSentPacket(uint32_t packet_id, Timestamp send_time, uint16_t payload_len)
+{
+    struct qed_observation *obs =
+        make_qed_observation("client_send_time", timestamp_to_nsec(&send_time), packet_id, payload_len, args.snd_tos);
+    struct observation_list_entry *observation_list_entry =
+        (struct observation_list_entry *) malloc(sizeof(struct observation_list_entry));
     observation_list_entry->observation = obs;
     observation_list_entry->next = NULL;
     // Lock the sender mutex
     pthread_mutex_lock(&observation_list_mutex);
-    if(observation_list->first == NULL) {
+    if (observation_list->first == NULL) {
         observation_list->first = observation_list_entry;
         observation_list->last = observation_list_entry;
     } else {
@@ -460,25 +493,27 @@ void Client::addSentPacket(uint32_t packet_id, Timestamp send_time, uint16_t pay
     pthread_mutex_unlock(&observation_list_mutex);
 }
 
-int Client::getSentPackets() {
+int Client::getSentPackets()
+{
     return sent_packets;
 }
 
-Timestamp Client::sendPacket(uint32_t idx, size_t payload_len) {
+Timestamp Client::sendPacket(uint32_t idx, size_t payload_len)
+{
     // Send the UDP packet
     ClientPacket senderPacket = craftSenderPacket(idx);
     struct iovec iov[1];
-    iov[0].iov_base=&senderPacket;
-    iov[0].iov_len=payload_len;
-    for (const auto& rai : remote_address_info) {
+    iov[0].iov_base = &senderPacket;
+    iov[0].iov_len = payload_len;
+    for (const auto &rai : remote_address_info) {
         struct msghdr message = {};
-        message.msg_name=rai->ai_addr;
-        message.msg_namelen=rai->ai_addrlen;
-        message.msg_iov=iov;
-        message.msg_iovlen=1;
-        message.msg_control= nullptr;
-        message.msg_controllen=0;
-        if (sendmsg(fd,&message,0)==-1) {
+        message.msg_name = rai->ai_addr;
+        message.msg_namelen = rai->ai_addrlen;
+        message.msg_iov = iov;
+        message.msg_iovlen = 1;
+        message.msg_control = nullptr;
+        message.msg_controllen = 0;
+        if (sendmsg(fd, &message, 0) == -1) {
             std::cerr << strerror(errno) << std::endl;
             throw std::runtime_error(std::string("Sending UDP message failed with error."));
         }
@@ -486,11 +521,12 @@ Timestamp Client::sendPacket(uint32_t idx, size_t payload_len) {
     return ntohts(senderPacket.send_time_data);
 }
 
-ClientPacket Client::craftSenderPacket(uint32_t idx){
+ClientPacket Client::craftSenderPacket(uint32_t idx)
+{
     ClientPacket packet = {};
     packet.seq_number = htonl(idx);
     packet.error_estimate = htons(0x8001); // Sync = 1, Multiplier = 1.
-    if(args.sync_time){
+    if (args.sync_time) {
         uint32_t ts = TimeSynchronizer::LocalTimeToDatagramTS24(get_usec());
         uint32_t delta = timeSynchronizer->GetMinDeltaTS24().ToUnsigned();
         Timestamp send_time_data = {};
@@ -504,36 +540,37 @@ ClientPacket Client::craftSenderPacket(uint32_t idx){
     return packet;
 }
 
-bool Client::awaitAndHandleResponse() {
+bool Client::awaitAndHandleResponse()
+{
     // Read incoming datagram
-    char buffer[sizeof(ReflectorPacket)]; //We should only be receiving ReflectorPackets
+    char buffer[sizeof(ReflectorPacket)]; // We should only be receiving ReflectorPackets
     char control[2048];
-    struct sockaddr src_addr{};
+    struct sockaddr src_addr {};
 
     struct iovec iov;
-    iov.iov_base=buffer;
-    iov.iov_len=sizeof(buffer);
+    iov.iov_base = buffer;
+    iov.iov_len = sizeof(buffer);
 
     timespec incoming_timestamp;
     timespec *incoming_timestamp_ptr = &incoming_timestamp;
 
-    struct msghdr incoming_msg{};
-    incoming_msg.msg_name=&src_addr;
-    incoming_msg.msg_namelen=sizeof(src_addr);
-    incoming_msg.msg_iov=&iov;
-    incoming_msg.msg_iovlen=1;
+    struct msghdr incoming_msg {};
+    incoming_msg.msg_name = &src_addr;
+    incoming_msg.msg_namelen = sizeof(src_addr);
+    incoming_msg.msg_iov = &iov;
+    incoming_msg.msg_iovlen = 1;
     incoming_msg.msg_control = control;
     incoming_msg.msg_controllen = sizeof(control);
 
-    ssize_t count=recvmsg(fd, &incoming_msg, MSG_WAITALL);
+    ssize_t count = recvmsg(fd, &incoming_msg, MSG_WAITALL);
     get_kernel_timestamp(incoming_msg, incoming_timestamp_ptr);
-    if (count==-1) {
+    if (count == -1) {
         std::cerr << strerror(errno) << std::endl;
         return false;
     } else if (incoming_msg.msg_flags & MSG_TRUNC) {
         return false;
     } else {
-        auto *rec = (ReflectorPacket *)buffer;
+        auto *rec = (ReflectorPacket *) buffer;
         handleReflectorPacket(rec, incoming_msg, count, incoming_timestamp_ptr);
     }
     return true;
@@ -549,26 +586,34 @@ struct TimeData {
     uint64_t server_send_time;
 };
 
-TimeData computeTimeData(bool sync_time, uint64_t client_receive_time, ReflectorPacket *reflectorPacket, TimeSynchronizer* timeSynchronizer) {
+TimeData computeTimeData(bool sync_time,
+                         uint64_t client_receive_time,
+                         ReflectorPacket *reflectorPacket,
+                         TimeSynchronizer *timeSynchronizer)
+{
     TimeData timeData;
-    if(sync_time) {
+    if (sync_time) {
         uint32_t server_timestamp = ntohl(reflectorPacket->server_time_data.integer);
         uint32_t server_delta = ntohl(reflectorPacket->server_time_data.fractional);
         uint32_t client_timestamp = ntohl(reflectorPacket->client_time_data.integer);
 
-        int64_t server_client_delay = timeSynchronizer->OnAuthenticatedDatagramTimestamp(server_timestamp, client_receive_time);
+        int64_t server_client_delay =
+            timeSynchronizer->OnAuthenticatedDatagramTimestamp(server_timestamp, client_receive_time);
         timeSynchronizer->OnPeerMinDeltaTS24(server_delta);
 
-        auto a = timeSynchronizer->To64BitUSec(client_receive_time, timeSynchronizer->ToRemoteTime23(timeSynchronizer->To64BitUSec(client_receive_time, client_timestamp)));
+        auto a = timeSynchronizer->To64BitUSec(
+            client_receive_time,
+            timeSynchronizer->ToRemoteTime23(timeSynchronizer->To64BitUSec(client_receive_time, client_timestamp)));
         auto b = timeSynchronizer->To64BitUSec(client_receive_time, server_timestamp);
-        int64_t client_server_delay = (int64_t)(b - a);
+        int64_t client_server_delay = (int64_t) (b - a);
 
         timeData.client_send_time = timeSynchronizer->To64BitUSec(client_receive_time, client_timestamp);
         timeData.server_receive_time = timeSynchronizer->To64BitUSec(client_receive_time, server_timestamp);
-        timeData.server_send_time = timeSynchronizer->To64BitUSec(client_receive_time, ntohl(reflectorPacket->send_time_data.integer));
+        timeData.server_send_time =
+            timeSynchronizer->To64BitUSec(client_receive_time, ntohl(reflectorPacket->send_time_data.integer));
 
-        timeData.internal_delay = (int64_t)(timeData.server_send_time - timeData.server_receive_time);
-        timeData.rtt = (int64_t)(client_receive_time - timeData.client_send_time);
+        timeData.internal_delay = (int64_t) (timeData.server_send_time - timeData.server_receive_time);
+        timeData.rtt = (int64_t) (client_receive_time - timeData.client_send_time);
         timeData.client_server_delay = client_server_delay;
         timeData.server_client_delay = server_client_delay;
     } else {
@@ -588,7 +633,15 @@ TimeData computeTimeData(bool sync_time, uint64_t client_receive_time, Reflector
     return timeData;
 }
 
-void populateMetricData(MetricData &data, ReflectorPacket *reflectorPacket, const IPHeader &ipHeader, const std::string &host, uint16_t local_port, uint16_t port, ssize_t payload_len, TimeData &timeData) {
+void populateMetricData(MetricData &data,
+                        ReflectorPacket *reflectorPacket,
+                        const IPHeader &ipHeader,
+                        const std::string &host,
+                        uint16_t local_port,
+                        uint16_t port,
+                        ssize_t payload_len,
+                        TimeData &timeData)
+{
     data.ip = host;
     data.sending_port = local_port;
     data.receiving_port = port;
@@ -602,14 +655,16 @@ void populateMetricData(MetricData &data, ReflectorPacket *reflectorPacket, cons
     data.rtt_delay = timeData.rtt;
 }
 
-void Client::enqueue_observation(struct qed_observation *obs) {
+void Client::enqueue_observation(struct qed_observation *obs)
+{
     // Lock the receiver mutex
     pthread_mutex_lock(&observation_list_mutex);
     // Enqueue the observation in the FIFO
-    struct observation_list_entry *entry = (struct observation_list_entry*)malloc(sizeof(struct observation_list_entry));
+    struct observation_list_entry *entry =
+        (struct observation_list_entry *) malloc(sizeof(struct observation_list_entry));
     entry->observation = obs;
     entry->next = NULL;
-    if(observation_list->first == NULL) {
+    if (observation_list->first == NULL) {
         observation_list->first = entry;
         observation_list->last = entry;
     } else {
@@ -621,7 +676,11 @@ void Client::enqueue_observation(struct qed_observation *obs) {
     sem_post(&observation_semaphore);
 }
 
-void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msghdr, ssize_t payload_len, timespec *incoming_timestamp) {
+void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket,
+                                   msghdr msghdr,
+                                   ssize_t payload_len,
+                                   timespec *incoming_timestamp)
+{
     Timestamp client_receive_time;
     uint64_t incoming_timestamp_nanoseconds = 0;
     if (incoming_timestamp->tv_sec == 0 && incoming_timestamp->tv_nsec == 0) {
@@ -629,7 +688,7 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msgh
         client_receive_time = get_timestamp();
         incoming_timestamp_nanoseconds = timestamp_to_nsec(&client_receive_time);
     } else {
-        //Convert timespec to timestamp
+        // Convert timespec to timestamp
         incoming_timestamp_nanoseconds = incoming_timestamp->tv_sec * 1000000000 + incoming_timestamp->tv_nsec;
     }
     last_packet_received_epoch_nanoseconds = incoming_timestamp_nanoseconds;
@@ -643,10 +702,16 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msgh
     // uint16_t  port = ntohs(sock->sin_port);
     // uint16_t local_port = atoi(args.local_port.c_str());
     uint32_t packet_id = ntohl(reflectorPacket->seq_number);
-    
-    struct qed_observation *obs1 = make_qed_observation("client_receive_time", incoming_timestamp_nanoseconds, packet_id, payload_len, tos);
-    struct qed_observation *obs2 = make_qed_observation("server_receive_time", timestamp_to_nsec(&server_receive_time), packet_id, payload_len, tos);
-    struct qed_observation *obs3 = make_qed_observation("server_send_time", timestamp_to_nsec(&server_send_time), packet_id, payload_len, tos);
+
+    struct qed_observation *obs1 =
+        make_qed_observation("client_receive_time", incoming_timestamp_nanoseconds, packet_id, payload_len, tos);
+    struct qed_observation *obs2 = make_qed_observation("server_receive_time",
+                                                        timestamp_to_nsec(&server_receive_time),
+                                                        packet_id,
+                                                        payload_len,
+                                                        tos);
+    struct qed_observation *obs3 =
+        make_qed_observation("server_send_time", timestamp_to_nsec(&server_send_time), packet_id, payload_len, tos);
 
     // Queue all observations in the FIFO to the collator
     enqueue_observation(obs1);
@@ -657,13 +722,17 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msgh
     }
 }
 
-void Client::printReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msghdr, ssize_t payload_len, timespec *incoming_timestamp) {
+void Client::printReflectorPacket(ReflectorPacket *reflectorPacket,
+                                  msghdr msghdr,
+                                  ssize_t payload_len,
+                                  timespec *incoming_timestamp)
+{
     uint64_t client_receive_time = incoming_timestamp->tv_sec * 1000000000 + incoming_timestamp->tv_nsec;
     IPHeader ipHeader = get_ip_header(msghdr);
-    sockaddr_in *sock = ((sockaddr_in *)msghdr.msg_name);
+    sockaddr_in *sock = ((sockaddr_in *) msghdr.msg_name);
     std::string host = inet_ntoa(sock->sin_addr);
     uint16_t local_port = atoi(args.local_port.c_str());
-    uint16_t  port = ntohs(sock->sin_port);
+    uint16_t port = ntohs(sock->sin_port);
     uint32_t packet_id = ntohl(reflectorPacket->seq_number);
 
     TimeData timeData = computeTimeData(args.sync_time, client_receive_time, reflectorPacket, timeSynchronizer);
@@ -678,33 +747,32 @@ void Client::printReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msghd
     }
 }
 
-void Client::printHeader() {
+void Client::printHeader()
+{
     if (args.print_format == "legacy") {
-        std::cout << "Time"<< args.sep << "IP"<< args.sep << "Snd#"<< args.sep << "Rcv#"<< args.sep << "SndPort"<< args.sep
-            << "RscPort"<< args.sep << "Sync"<< args.sep << "FW_TTL"<< args.sep << "SW_TTL"<< args.sep << "SndTOS"<< args.sep
-            << "FW_TOS"<< args.sep << "SW_TOS"<< args.sep << "RTT"<< args.sep << "IntD"<< args.sep << "FWD"<< args.sep
-            << "BWD"<< args.sep << "PLEN" << args.sep << "LOSS" << "\n";
+        std::cout << "Time" << args.sep << "IP" << args.sep << "Snd#" << args.sep << "Rcv#" << args.sep << "SndPort"
+                  << args.sep << "RscPort" << args.sep << "Sync" << args.sep << "FW_TTL" << args.sep << "SW_TTL"
+                  << args.sep << "SndTOS" << args.sep << "FW_TOS" << args.sep << "SW_TOS" << args.sep << "RTT"
+                  << args.sep << "IntD" << args.sep << "FWD" << args.sep << "BWD" << args.sep << "PLEN" << args.sep
+                  << "LOSS"
+                  << "\n";
     } else if (args.print_format == "raw") {
-        std::cout << "packet_id" << args.sep
-        << "payload_len" << args.sep
-        << "client_send_epoch_nanoseconds" << args.sep
-        << "server_receive_epoch_nanoseconds" << args.sep
-        << "server_send_epoch_nanoseconds" << args.sep
-        << "client_receive_epoch_nanoseconds" << "\n";
+        std::cout << "packet_id" << args.sep << "payload_len" << args.sep << "client_send_epoch_nanoseconds" << args.sep
+                  << "server_receive_epoch_nanoseconds" << args.sep << "server_send_epoch_nanoseconds" << args.sep
+                  << "client_receive_epoch_nanoseconds"
+                  << "\n";
     } else if (args.print_format == "clockcorrected") {
-        std::cout << "packet_id" << args.sep
-        << "payload_len" << args.sep
-        << "packet_generated_timestamp" << args.sep
-        << "delay_to_server" << args.sep
-        << "delay_to_server_response" << args.sep
-        << "delay_round_trip" << "\n";
+        std::cout << "packet_id" << args.sep << "payload_len" << args.sep << "packet_generated_timestamp" << args.sep
+                  << "delay_to_server" << args.sep << "delay_to_server_response" << args.sep << "delay_round_trip"
+                  << "\n";
     }
 }
 
-void Client::printMetrics(const MetricData& data) {
+void Client::printMetrics(const MetricData &data)
+{
     char sync = 'N';
-    uint64_t estimated_rtt = data.client_server_delay+data.server_client_delay+data.internal_delay;
-    if(isWithinEpsilon((double)data.rtt_delay*1e-6, (double)estimated_rtt*1e-6, 0.01)){
+    uint64_t estimated_rtt = data.client_server_delay + data.server_client_delay + data.internal_delay;
+    if (isWithinEpsilon((double) data.rtt_delay * 1e-6, (double) estimated_rtt * 1e-6, 0.01)) {
         sync = 'Y';
     }
     if ((data.client_server_delay < 0) || (data.server_client_delay < 0)) {
@@ -714,89 +782,55 @@ void Client::printMetrics(const MetricData& data) {
     uint32_t rcv_sn = ntohl(data.packet.seq_number);
     uint32_t snd_sn = ntohl(data.packet.sender_seq_number);
 
-    std::cout
-    << std::fixed
-    << data.initial_send_time
-    << args.sep
-    << data.ip
-    << args.sep
-    << snd_sn
-    << args.sep
-    << rcv_sn
-    << args.sep
-    << data.sending_port
-    << args.sep
-    << data.receiving_port
-    << args.sep
-    << sync
-    << args.sep
-    << unsigned(data.packet.sender_ttl)
-    << args.sep
-    << unsigned(data.ipHeader.ttl)
-    << args.sep
-    << unsigned(data.packet.sender_tos)
-    << args.sep
-    << '-'
-    << args.sep
-    << unsigned(data.ipHeader.tos)
-    << args.sep
-    <<(double) data.rtt_delay * 1e-6 // Nanoseconds to milliseconds
-    << args.sep
-    <<(double) data.internal_delay* 1e-6
-    << args.sep
-    << (double) data.client_server_delay * 1e-6
-    << args.sep
-    << (double) data.server_client_delay * 1e-6
-    << args.sep
-    << data.payload_length
-    << args.sep
-    << data.packet_loss
-    << "\n";
+    std::cout << std::fixed << data.initial_send_time << args.sep << data.ip << args.sep << snd_sn << args.sep << rcv_sn
+              << args.sep << data.sending_port << args.sep << data.receiving_port << args.sep << sync << args.sep
+              << unsigned(data.packet.sender_ttl) << args.sep << unsigned(data.ipHeader.ttl) << args.sep
+              << unsigned(data.packet.sender_tos) << args.sep << '-' << args.sep << unsigned(data.ipHeader.tos)
+              << args.sep << (double) data.rtt_delay * 1e-6 // Nanoseconds to milliseconds
+              << args.sep << (double) data.internal_delay * 1e-6 << args.sep << (double) data.client_server_delay * 1e-6
+              << args.sep << (double) data.server_client_delay * 1e-6 << args.sep << data.payload_length << args.sep
+              << data.packet_loss << "\n";
 }
 
-void Client::print_lost_packet(uint32_t packet_id, uint64_t initial_send_time, uint16_t payload_len) {
-    std::cout 
-    << std::fixed
-    << initial_send_time
-    << args.sep
-    //<< data.ip
-    << args.sep
-    << packet_id
-    << args.sep
-    //<< rcv_sn
-    << args.sep
-    //<< data.sending_port
-    << args.sep
-    //<< data.receiving_port
-    << args.sep
-    //<< sync
-    << args.sep
-    //<< unsigned(data.packet.sender_ttl)
-    << args.sep
-    //<< unsigned(data.ipHeader.ttl)
-    << args.sep
-    //<< unsigned(data.packet.sender_tos)
-    << args.sep
-    << '-'
-    << args.sep
-    //<< unsigned(data.ipHeader.tos)
-    << args.sep
-    //<<(double) data.rtt_delay * 1e-3
-    << args.sep
-    //<<(double) data.internal_delay* 1e-3
-    << args.sep
-    //<< (double) data.client_server_delay * 1e-3
-    << args.sep
-    //<< (double) data.server_client_delay * 1e-3
-    << args.sep
-    << payload_len
-    << args.sep
-    //<< data.packet_loss
-    << "\n";
+void Client::print_lost_packet(uint32_t packet_id, uint64_t initial_send_time, uint16_t payload_len)
+{
+    std::cout << std::fixed << initial_send_time
+              << args.sep
+              //<< data.ip
+              << args.sep << packet_id
+              << args.sep
+              //<< rcv_sn
+              << args.sep
+              //<< data.sending_port
+              << args.sep
+              //<< data.receiving_port
+              << args.sep
+              //<< sync
+              << args.sep
+              //<< unsigned(data.packet.sender_ttl)
+              << args.sep
+              //<< unsigned(data.ipHeader.ttl)
+              << args.sep
+              //<< unsigned(data.packet.sender_tos)
+              << args.sep << '-'
+              << args.sep
+              //<< unsigned(data.ipHeader.tos)
+              << args.sep
+              //<<(double) data.rtt_delay * 1e-3
+              << args.sep
+              //<<(double) data.internal_delay* 1e-3
+              << args.sep
+              //<< (double) data.client_server_delay * 1e-3
+              << args.sep
+              //<< (double) data.server_client_delay * 1e-3
+              << args.sep << payload_len
+              << args.sep
+              //<< data.packet_loss
+              << "\n";
 }
 
-template <typename Func>
-void Client::printSummaryLine(const std::string& label, Func func) {
+template <typename Func> void Client::printSummaryLine(const std::string &label, Func func)
+{
     std::cout << " " << std::left << std::setw(10) << label << std::setprecision(6);
     std::cout << func(stats_RTT) << " s      ";
     std::cout << func(stats_client_server) << " s      ";
@@ -804,25 +838,30 @@ void Client::printSummaryLine(const std::string& label, Func func) {
     std::cout << func(stats_internal) << " s\n";
 }
 
-void Client::printStats(int packets_sent) {
-    //printLostPackets();
+void Client::printStats(int packets_sent)
+{
+    // printLostPackets();
     std::cout << std::fixed;
-    std::cout << "Time spent generating packets: " << (double)(Client::last_packet_sent_epoch_nanoseconds - Client::first_packet_sent_epoch_nanoseconds) / 1e9 << " s\n";
+    std::cout
+        << "Time spent generating packets: "
+        << (double) (Client::last_packet_sent_epoch_nanoseconds - Client::first_packet_sent_epoch_nanoseconds) / 1e9
+        << " s\n";
     Timestamp now_ts = get_timestamp();
-    std::cout << "Total time elapsed: " << (double)(timestamp_to_nsec(&now_ts) - Client::first_packet_sent_epoch_nanoseconds) / 1e9 << " s\n";
+    std::cout << "Total time elapsed: "
+              << (double) (timestamp_to_nsec(&now_ts) - Client::first_packet_sent_epoch_nanoseconds) / 1e9 << " s\n";
     std::cout << "Packets sent: " << packets_sent << "\n";
     std::cout << "Packets lost: " << sqa_stats_get_number_of_lost_packets(Client::stats_RTT) << "\n";
     std::cout << "Packet loss: " << sqa_stats_get_loss_percentage(Client::stats_RTT) << "%\n";
     std::cout << "           RTT             FWD             BWD             Internal\n";
-    
-    auto printPercentileLine = [&](const std::string& label, double percentile) {
+
+    auto printPercentileLine = [&](const std::string &label, double percentile) {
         std::cout << " " << std::left << std::setw(10) << label << std::setprecision(6);
         std::cout << sqa_stats_get_percentile(Client::stats_RTT, percentile) << " s      ";
         std::cout << sqa_stats_get_percentile(Client::stats_client_server, percentile) << " s      ";
         std::cout << sqa_stats_get_percentile(Client::stats_server_client, percentile) << " s      ";
         std::cout << sqa_stats_get_percentile(Client::stats_internal, percentile) << " s\n";
     };
-    
+
     printSummaryLine("mean:", sqa_stats_get_mean);
     printSummaryLine("median:", sqa_stats_get_median);
     printSummaryLine("min:", sqa_stats_get_min_as_seconds);
@@ -834,7 +873,8 @@ void Client::printStats(int packets_sent) {
     printPercentileLine("p99.9:", 99.9);
 }
 
-nlohmann::json td_to_json(td_histogram_t *histogram) {
+nlohmann::json td_to_json(td_histogram_t *histogram)
+{
     nlohmann::json json;
     td_compress(histogram);
     json["compression"] = histogram->compression;
@@ -842,32 +882,31 @@ nlohmann::json td_to_json(td_histogram_t *histogram) {
     // Create the digest-centroid array
     nlohmann::json centroidsJson = nlohmann::json::array();
     for (int i = 0; i < histogram->merged_nodes; ++i) {
-        centroidsJson.push_back({
-            {"m", histogram->nodes_mean[i]},
-            {"c", histogram->nodes_weight[i]}
-        });
+        centroidsJson.push_back({{"m", histogram->nodes_mean[i]}, {"c", histogram->nodes_weight[i]}});
     }
 
     json["digest-centroid"] = centroidsJson;
     return json;
 }
 
-std::string map_tos_to_traffic_class(uint8_t tos) {
+std::string map_tos_to_traffic_class(uint8_t tos)
+{
     switch (tos) {
-        case 0x00:
-            return "BE";
-        case 0x20:
-            return "BK";
-        case 0x80:
-            return "VI";
-        case 0xA0:
-            return "VO";
-        default:
-            return "Unknown";
+    case 0x00:
+        return "BE";
+    case 0x20:
+        return "BK";
+    case 0x80:
+        return "VI";
+    case 0xA0:
+        return "VO";
+    default:
+        return "Unknown";
     }
 }
 
-void Client::JsonLog(std::string json_output_file) {
+void Client::JsonLog(std::string json_output_file)
+{
     nlohmann::json logData;
     time_t first_sent_seconds = Client::first_packet_sent_epoch_nanoseconds / 1e9;
     int microseconds = Client::first_packet_sent_epoch_nanoseconds % 1000000000;
@@ -876,7 +915,8 @@ void Client::JsonLog(std::string json_output_file) {
     strftime(first_packet_sent_date, sizeof(first_packet_sent_date), "%Y-%m-%dT%H:%M:%S", now_as_tm_date);
     // Add the microseconds back in:
     sprintf(first_packet_sent_date, "%s.%06dZ", first_packet_sent_date, microseconds);
-    long duration_nanoseconds = (Client::last_packet_received_epoch_nanoseconds - Client::first_packet_sent_epoch_nanoseconds);
+    long duration_nanoseconds =
+        (Client::last_packet_received_epoch_nanoseconds - Client::first_packet_sent_epoch_nanoseconds);
     double duration = duration_nanoseconds / 1e9;
     // Describe the sampling pattern
     nlohmann::json samplingpattern;
@@ -886,36 +926,24 @@ void Client::JsonLog(std::string json_output_file) {
     samplingpattern["min"] = 0;
     samplingpattern["max"] = 10.0;
     logData["sampling_pattern"] = samplingpattern;
-    //Describe the packet size distribution
+    // Describe the packet size distribution
     logData["packet_sizes"] = nlohmann::json::array();
-    for (const auto& payload_len : args.payload_lens) {
+    for (const auto &payload_len : args.payload_lens) {
         logData["packet_sizes"].push_back(payload_len);
     }
     logData["traffic_class"] = map_tos_to_traffic_class(args.snd_tos);
 
     // Describe the observation points
     logData["intermediate_nodes"] = nlohmann::json::array();
-    logData["start_node"] = {
-        {"ip", "localhost"},
-        {"port", args.local_port}
-    };
+    logData["start_node"] = {{"ip", "localhost"}, {"port", args.local_port}};
     // Loop through the list of remote hosts and ports
     for (int i = 0; i < args.remote_hosts.size(); ++i) {
-        logData["intermediate_nodes"].push_back({
-            {"ip", args.remote_hosts[i]},
-            {"port", args.remote_ports[i]},
-            {"label", "1"}
-        });
-        logData["intermediate_nodes"].push_back({
-            {"ip", args.remote_hosts[i]},
-            {"port", args.remote_ports[i]},
-            {"label", "2"}
-        });
+        logData["intermediate_nodes"].push_back(
+            {{"ip", args.remote_hosts[i]}, {"port", args.remote_ports[i]}, {"label", "1"}});
+        logData["intermediate_nodes"].push_back(
+            {{"ip", args.remote_hosts[i]}, {"port", args.remote_ports[i]}, {"label", "2"}});
     }
-    logData["end_node"] = {
-        {"ip", "localhost"},
-        {"port", args.local_port}
-    };
+    logData["end_node"] = {{"ip", "localhost"}, {"port", args.local_port}};
 
     logData["version"] = "0.1";
     logData["qualityattenuationaggregate"] = {
@@ -930,30 +958,35 @@ void Client::JsonLog(std::string json_output_file) {
         {"empirical_distribution", td_to_json(Client::stats_RTT->empirical_distribution)},
     };
 
-    //Dump data to file
+    // Dump data to file
     std::ofstream file(json_output_file);
     file << std::setw(4) << logData << std::endl;
     file.close();
 }
 
-struct observation_list * sent_packet_list_create() {
-    struct observation_list *res = (struct observation_list*)malloc(sizeof(struct observation_list));
+struct observation_list *sent_packet_list_create()
+{
+    struct observation_list *res = (struct observation_list *) malloc(sizeof(struct observation_list));
     res->first = NULL;
     res->last = NULL;
     return res;
 }
 
-void sent_packet_list_destroy(struct observation_list* spl) {
-    struct observation_list_entry* next = NULL;
-    struct observation_list_entry* first = spl->first;
-    while(first != NULL) {
+void sent_packet_list_destroy(struct observation_list *spl)
+{
+    struct observation_list_entry *next = NULL;
+    struct observation_list_entry *first = spl->first;
+    while (first != NULL) {
         next = first->next;
         free(first);
         first = next;
     }
 }
 
-void remove_packet(struct observation_list_entry *packet, struct observation_list_entry *prev_packet, struct observation_list *spl) {
+void remove_packet(struct observation_list_entry *packet,
+                   struct observation_list_entry *prev_packet,
+                   struct observation_list *spl)
+{
     if (packet->next == NULL && prev_packet == NULL) {
         // list now empty
         spl->first = NULL;
@@ -961,7 +994,7 @@ void remove_packet(struct observation_list_entry *packet, struct observation_lis
     } else if (prev_packet == NULL) {
         // We're removing the first entry in the list
         spl->first = packet->next;
-    } else if (packet->next == NULL){
+    } else if (packet->next == NULL) {
         // We're removing the entry at the end of the list
         prev_packet->next = NULL;
         spl->last = prev_packet;

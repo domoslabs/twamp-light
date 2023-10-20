@@ -8,7 +8,7 @@
 #include <cstdint>
 #include "Counter.h"
 
-#define TST_PKT_SIZE 1472       //1472 (MTU 1514)
+#define TST_PKT_SIZE 1472 // 1472 (MTU 1514)
 struct Timestamp {
     uint32_t integer = 0;
     uint32_t fractional = 0;
@@ -37,4 +37,4 @@ struct ReflectorPacket {
     uint8_t sender_tos = 0;
     uint8_t padding[TST_PKT_SIZE - 42];
 };
-#endif //TWAMP_LIGHT_PACKETS_H
+#endif // TWAMP_LIGHT_PACKETS_H

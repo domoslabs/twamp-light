@@ -17,6 +17,8 @@ struct observation_list {
     struct observation_list_entry *last;
 };
 
-struct observation_list * sent_packet_list_create();
+struct observation_list *sent_packet_list_create();
 void sent_packet_list_destroy(struct observation_list *spl);
-void remove_packet(struct observation_list_entry *packet, struct observation_list_entry *prev_packet, struct observation_list *spl);
+void remove_packet(struct observation_list_entry *packet,
+                   struct observation_list_entry *prev_packet,
+                   struct observation_list *spl);

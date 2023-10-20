@@ -34,7 +34,6 @@ struct Args {
     std::string json_output_file;
 };
 
-
 struct RawData {
     RawData *next;
     RawData *prev;
@@ -61,10 +60,9 @@ struct DelayData {
     uint64_t delay_round_trip;
 };
 
-
 struct MetricData {
     std::string ip;
-    uint16_t sending_port= 0;
+    uint16_t sending_port = 0;
     uint16_t receiving_port = 0;
     uint16_t payload_length = 0;
     int64_t client_server_delay = 0;
@@ -74,12 +72,12 @@ struct MetricData {
     uint16_t packet_loss = 0;
     uint64_t initial_send_time = 0;
     ReflectorPacket packet;
-    IPHeader  ipHeader;
+    IPHeader ipHeader;
 };
 
 class Client {
-public:
-    Client(const Args& args);
+  public:
+    Client(const Args &args);
     ~Client();
     Timestamp sendPacket(uint32_t idx, size_t payload_len);
     bool awaitAndHandleResponse();
@@ -89,6 +87,7 @@ public:
     void aggregateRawData(RawData *oldest_raw_data);
     void aggregateDelayData();
     void runSenderThread();
+    void runReceiverThread();
     void runCollatorThread();
     void addSentPacket(uint32_t packet_id, Timestamp send_time, uint16_t payload_len);
     void enqueue_observation(struct qed_observation *obs);
@@ -99,42 +98,43 @@ public:
     void printHeader();
     void JsonLog(std::string filename);
 
-private:
+  private:
     int fd = -1;
-    int sent_packets=0;
+    int sent_packets = 0;
     int sending_completed = 0;
     bool header_printed = false;
     sem_t observation_semaphore;
     pthread_mutex_t observation_list_mutex = PTHREAD_MUTEX_INITIALIZER;
     struct observation_list *observation_list;
-    std::vector<struct addrinfo*> remote_address_info={};
-    struct addrinfo* local_address_info= {};
-    struct sqa_stats* stats_RTT;
-    struct sqa_stats* stats_internal;
-    struct sqa_stats* stats_client_server;
-    struct sqa_stats* stats_server_client;
-    struct RawDataList* raw_data_list;
-    struct DelayData** delay_data;
+    std::vector<struct addrinfo *> remote_address_info = {};
+    struct addrinfo *local_address_info = {};
+    struct sqa_stats *stats_RTT;
+    struct sqa_stats *stats_internal;
+    struct sqa_stats *stats_client_server;
+    struct sqa_stats *stats_server_client;
+    struct RawDataList *raw_data_list;
+    struct DelayData **delay_data;
     uint64_t first_packet_sent_epoch_nanoseconds = 0;
     uint64_t last_packet_sent_epoch_nanoseconds = 0;
     uint64_t last_packet_received_epoch_nanoseconds = 0;
     Args args;
-    TimeSynchronizer* timeSynchronizer = new TimeSynchronizer();
+    TimeSynchronizer *timeSynchronizer = new TimeSynchronizer();
     ClientPacket craftSenderPacket(uint32_t idx);
-    void printStat(const char* statName, sqa_stats* statType);
+    void printStat(const char *statName, sqa_stats *statType);
 
-    void
-    handleReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msghdr, ssize_t payload_len, timespec *incoming_timestamp);
+    void handleReflectorPacket(ReflectorPacket *reflectorPacket,
+                               msghdr msghdr,
+                               ssize_t payload_len,
+                               timespec *incoming_timestamp);
 
-    void printReflectorPacket(ReflectorPacket *reflectorPacket, msghdr msghdr, ssize_t payload_len, timespec *incoming_timestamp);
+    void printReflectorPacket(ReflectorPacket *reflectorPacket,
+                              msghdr msghdr,
+                              ssize_t payload_len,
+                              timespec *incoming_timestamp);
 
-    template <typename Func>
-    void
-    printSummaryLine(const std::string& label, Func func);
+    template <typename Func> void printSummaryLine(const std::string &label, Func func);
 
-    void
-    printMetrics(const MetricData& data);
+    void printMetrics(const MetricData &data);
 };
 
-
-#endif //TWAMP_LIGHT_CLIENT_H
+#endif // TWAMP_LIGHT_CLIENT_H
