@@ -171,15 +171,17 @@ void Client::runSenderThread()
 void Client::runReceiverThread()
 {
     uint32_t index = 0;
+    time_t time_of_last_received_packet = time(NULL);
     while ((args.num_samples == 0 ||
-            index < args.num_samples *
+            (index < args.num_samples *
                         args.remote_hosts
-                            .size())) // run forever if num_samples is 0, otherwise run until num_samples is reached
+                            .size() && time(NULL) - time_of_last_received_packet < args.timeout))) // run forever if num_samples is 0, otherwise run until num_samples is reached
     {
         bool response = awaitAndHandleResponse();
         if (response) {
             index++;
-        }
+            time_of_last_received_packet = time(NULL);
+        } 
     }
 }
 
