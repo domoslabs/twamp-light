@@ -23,6 +23,7 @@ Args parse_args(int argc, char **argv)
            "How long (in seconds) to keep the socket open, when no packets are incoming. Set to 0 to disable timeout.")
         ->default_str(std::to_string(args.timeout));
     app.add_option("--sep", args.sep, "The separator to use in the output.");
+    app.add_option("--ip", args.ip_version, "The IP version to use.");
     app.add_flag(
         "--sync{true}",
         args.sync_time,

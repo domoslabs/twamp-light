@@ -309,8 +309,26 @@ bool parseIPPort(const std::string &input, std::string &ip, uint16_t &port)
     }
 }
 
+bool parseIPv6Port(const std::string &input, std::string &ip, uint16_t &port)
+{
+    size_t lastColonPos = input.rfind(':');
+    
+    if (lastColonPos != std::string::npos) {
+        ip = input.substr(0, lastColonPos);
+        std::string port_str = input.substr(lastColonPos + 1);
+
+        int tmpport = atoi(port_str.c_str());
+        if (tmpport > 0 && tmpport < 65536) {
+            port = static_cast<uint16_t>(tmpport);
+            return true;
+        }
+    }
+
+    return false;
+}
+
 struct msghdr make_msghdr(
-    struct iovec *iov, size_t iov_len, struct sockaddr *addr, socklen_t addr_len, char *control, size_t control_len)
+    struct iovec *iov, size_t iov_len, struct sockaddr_in6 *addr, socklen_t addr_len, char *control, size_t control_len)
 {
     struct msghdr message = {};
     message.msg_name = addr;
@@ -320,4 +338,24 @@ struct msghdr make_msghdr(
     message.msg_control = control;
     message.msg_controllen = control_len;
     return message;
+}
+
+// Function to handle both IPv4 and IPv6
+void parse_ip_address(struct msghdr sender_msg, uint16_t *port, char *host, u_int8_t ip_version)
+{
+    if (ip_version == IPV4) {
+        sockaddr_in *sock = (sockaddr_in *) sender_msg.msg_name;
+        if (inet_ntop(AF_INET, &(sock->sin_addr), host, INET_ADDRSTRLEN) == NULL) {
+            // Handle error
+        }
+        *port = ntohs(sock->sin_port);
+    } else if (ip_version == IPV6) {
+        sockaddr_in6 *sock6 = (sockaddr_in6 *) sender_msg.msg_name;
+        if (inet_ntop(AF_INET6, &(sock6->sin6_addr), host, INET6_ADDRSTRLEN) == NULL) {
+            // Handle error
+        }
+        *port = ntohs(sock6->sin6_port);
+    } else {
+        // Handle invalid IP version
+    }
 }

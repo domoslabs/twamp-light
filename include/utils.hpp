@@ -16,6 +16,8 @@
 #define HDR_TTL 255 /* TTL=255 in TWAMP for IP Header */
 #define SERVER_PORT 862
 #define CHECK_TIMES 100
+#define IPV4 4
+#define IPV6 6
 
 /* TWAMP timestamp is NTP time (RFC1305).
  * Should be in network byte order!      */
@@ -62,6 +64,12 @@ template <typename Iter> Iter select_randomly(Iter start, Iter end, uint32_t see
 Timestamp ntohts(Timestamp ts);
 Timestamp htonts(Timestamp ts);
 bool parseIPPort(const std::string &input, std::string &ip, uint16_t &port);
-struct msghdr make_msghdr(
-    struct iovec *iov, size_t iov_len, struct sockaddr *addr, socklen_t addr_len, char *control, size_t control_len);
+bool parseIPv6Port(const std::string &input, std::string &ip, uint16_t &port);
+struct msghdr make_msghdr(struct iovec *iov,
+                          size_t iov_len,
+                          struct sockaddr_in6 *addr,
+                          socklen_t addr_len,
+                          char *control,
+                          size_t control_len);
+void parse_ip_address(struct msghdr sender_msg, uint16_t *port, char *host, uint8_t ip_version);
 #endif // DOMOS_TWAMP_LIGHT_TWAMP_LIGHT_HPP

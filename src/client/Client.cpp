@@ -25,7 +25,14 @@ Client::Client(const Args &args)
     // Construct remote socket address
     struct addrinfo hints {};
     memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET; // TODO IPv6
+    if (args.ip_version == IPV4) {
+        hints.ai_family = AF_INET;
+    } else if (args.ip_version == IPV6) {
+        hints.ai_family = AF_INET6;
+    } else {
+        std::cerr << "Invalid IP version." << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
     hints.ai_socktype = SOCK_DGRAM;
     hints.ai_protocol = 0;
     hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
@@ -126,8 +133,7 @@ std::string decode_observation_point(ObservationPoints observation_point)
 struct qed_observation *make_qed_observation(ObservationPoints observation_point,
                                              uint64_t epoch_nanoseconds,
                                              uint32_t packet_id,
-                                             uint16_t payload_len,
-                                             uint8_t tos)
+                                             uint16_t payload_len)
 {
     struct qed_observation *obs = (struct qed_observation *) malloc(sizeof(struct qed_observation));
     obs->observation_point = observation_point;
@@ -153,11 +159,8 @@ void Client::runSenderThread()
             first_packet_sent_epoch_nanoseconds = timestamp_to_nsec(&sent_time);
         }
         last_packet_sent_epoch_nanoseconds = timestamp_to_nsec(&sent_time);
-        struct qed_observation *obs = make_qed_observation(ObservationPoints::CLIENT_SEND,
-                                                           timestamp_to_nsec(&sent_time),
-                                                           index,
-                                                           payload_len,
-                                                           args.snd_tos);
+        struct qed_observation *obs =
+            make_qed_observation(ObservationPoints::CLIENT_SEND, timestamp_to_nsec(&sent_time), index, payload_len);
         enqueue_observation(obs);
         index++;
         usleep(delay);
@@ -173,15 +176,15 @@ void Client::runReceiverThread()
     uint32_t index = 0;
     time_t time_of_last_received_packet = time(NULL);
     while ((args.num_samples == 0 ||
-            (index < args.num_samples *
-                        args.remote_hosts
-                            .size() && time(NULL) - time_of_last_received_packet < args.timeout))) // run forever if num_samples is 0, otherwise run until num_samples is reached
+            (index < args.num_samples * args.remote_hosts.size() &&
+             time(NULL) - time_of_last_received_packet <
+                 args.timeout))) // run forever if num_samples is 0, otherwise run until num_samples is reached
     {
         bool response = awaitAndHandleResponse();
         if (response) {
             index++;
             time_of_last_received_packet = time(NULL);
-        } 
+        }
     }
 }
 
@@ -366,13 +369,13 @@ int64_t calculate_correction(RawData **first_entry, RawData **last_entry)
 void Client::aggregateRawData(RawData *oldest_raw_data)
 {
     // Compute the delays (without clock correction), and add them to the sqa_stats
-    timespec client_server_delay = {0};
+    timespec client_server_delay = {};
     if (oldest_raw_data->client_send_epoch_nanoseconds > 0 && oldest_raw_data->server_receive_epoch_nanoseconds > 0) {
         client_server_delay = nanosecondsToTimespec(oldest_raw_data->server_receive_epoch_nanoseconds -
                                                     oldest_raw_data->client_send_epoch_nanoseconds);
         sqa_stats_add_sample(stats_client_server, &client_server_delay);
     }
-    timespec server_client_delay = {0};
+    timespec server_client_delay = {};
     if (oldest_raw_data->server_send_epoch_nanoseconds > 0 && oldest_raw_data->client_receive_epoch_nanoseconds > 0 &&
         oldest_raw_data->server_receive_epoch_nanoseconds > 0 && oldest_raw_data->client_send_epoch_nanoseconds > 0) {
         server_client_delay = nanosecondsToTimespec(oldest_raw_data->client_receive_epoch_nanoseconds -
@@ -447,7 +450,7 @@ bool Client::awaitAndHandleResponse()
     // Read incoming datagram
     char buffer[sizeof(ReflectorPacket)]; // We should only be receiving ReflectorPackets
     char control[2048];
-    struct sockaddr src_addr {};
+    struct sockaddr_in6 src_addr {};
 
     struct iovec iov;
     iov.iov_base = buffer;
@@ -591,29 +594,24 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket,
 
     Timestamp server_receive_time = ntohts(reflectorPacket->server_time_data);
     Timestamp server_send_time = ntohts(reflectorPacket->send_time_data);
-    IPHeader ipHeader = get_ip_header(msghdr);
-    uint8_t tos = ipHeader.tos;
+    //IPHeader ipHeader = get_ip_header(msghdr);
+    //uint8_t tos = ipHeader.tos;
     // sockaddr_in *sock = ((sockaddr_in *)msghdr.msg_name);
     // std::string host = inet_ntoa(sock->sin_addr);
     // uint16_t  port = ntohs(sock->sin_port);
     // uint16_t local_port = atoi(args.local_port.c_str());
     uint32_t packet_id = ntohl(reflectorPacket->seq_number);
 
-    struct qed_observation *obs1 = make_qed_observation(ObservationPoints::CLIENT_RECEIVE,
-                                                        incoming_timestamp_nanoseconds,
-                                                        packet_id,
-                                                        payload_len,
-                                                        tos);
+    struct qed_observation *obs1 =
+        make_qed_observation(ObservationPoints::CLIENT_RECEIVE, incoming_timestamp_nanoseconds, packet_id, payload_len);
     struct qed_observation *obs2 = make_qed_observation(ObservationPoints::SERVER_RECEIVE,
                                                         timestamp_to_nsec(&server_receive_time),
                                                         packet_id,
-                                                        payload_len,
-                                                        tos);
+                                                        payload_len);
     struct qed_observation *obs3 = make_qed_observation(ObservationPoints::SERVER_SEND,
                                                         timestamp_to_nsec(&server_send_time),
                                                         packet_id,
-                                                        payload_len,
-                                                        tos);
+                                                        payload_len);
 
     // Queue all observations in the FIFO to the collator
     enqueue_observation(obs3);
@@ -631,12 +629,10 @@ void Client::printReflectorPacket(ReflectorPacket *reflectorPacket,
 {
     uint64_t client_receive_time = incoming_timestamp->tv_sec * 1000000000 + incoming_timestamp->tv_nsec;
     IPHeader ipHeader = get_ip_header(msghdr);
-    sockaddr_in *sock = ((sockaddr_in *) msghdr.msg_name);
-    std::string host = inet_ntoa(sock->sin_addr);
+    char host[INET6_ADDRSTRLEN] = {0};
+    uint16_t port;
+    parse_ip_address(msghdr, &port, host, args.ip_version);
     uint16_t local_port = atoi(args.local_port.c_str());
-    uint16_t port = ntohs(sock->sin_port);
-    uint32_t packet_id = ntohl(reflectorPacket->seq_number);
-
     TimeData timeData = computeTimeData(args.sync_time, client_receive_time, reflectorPacket, timeSynchronizer);
 
     MetricData data;
@@ -814,9 +810,10 @@ void Client::JsonLog(std::string json_output_file)
     int microseconds = Client::first_packet_sent_epoch_nanoseconds % 1000000000;
     auto now_as_tm_date = std::gmtime(&first_sent_seconds);
     char first_packet_sent_date[80];
-    strftime(first_packet_sent_date, sizeof(first_packet_sent_date), "%Y-%m-%dT%H:%M:%S", now_as_tm_date);
+    strftime(first_packet_sent_date, sizeof(first_packet_sent_date) - 11, "%Y-%m-%dT%H:%M:%S", now_as_tm_date);
     // Add the microseconds back in:
-    sprintf(first_packet_sent_date, "%s.%06dZ", first_packet_sent_date, microseconds);
+    char first_packet_sent_date_with_microseconds[91];
+    sprintf(first_packet_sent_date_with_microseconds, "%s.%06dZ", first_packet_sent_date, microseconds);
     long duration_nanoseconds =
         (Client::last_packet_received_epoch_nanoseconds - Client::first_packet_sent_epoch_nanoseconds);
     double duration = duration_nanoseconds / 1e9;
@@ -839,7 +836,7 @@ void Client::JsonLog(std::string json_output_file)
     logData["intermediate_nodes"] = nlohmann::json::array();
     logData["start_node"] = {{"ip", "localhost"}, {"port", args.local_port}};
     // Loop through the list of remote hosts and ports
-    for (int i = 0; i < args.remote_hosts.size(); ++i) {
+    for (uint i = 0; i < args.remote_hosts.size(); ++i) {
         logData["intermediate_nodes"].push_back(
             {{"ip", args.remote_hosts[i]}, {"port", args.remote_ports[i]}, {"label", "1"}});
         logData["intermediate_nodes"].push_back(
@@ -849,7 +846,7 @@ void Client::JsonLog(std::string json_output_file)
 
     logData["version"] = "0.1";
     logData["qualityattenuationaggregate"] = {
-        {"t0", first_packet_sent_date},
+        {"t0", first_packet_sent_date_with_microseconds},
         {"duration", duration},
         {"num_samples", sqa_stats_get_number_of_samples(Client::stats_RTT)},
         {"num_lost_samples", sqa_stats_get_number_of_lost_packets(Client::stats_RTT)},

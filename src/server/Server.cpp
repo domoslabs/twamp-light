@@ -17,7 +17,14 @@ Server::Server(const Args &args)
     // Construct socket address
     struct addrinfo hints = {};
     memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET; // TODO IPv6
+    if (args.ip_version == 4) {
+        hints.ai_family = AF_INET; // TODO IPv6
+    } else if (args.ip_version == 6) {
+        hints.ai_family = AF_INET6;
+    } else {
+        std::cerr << "Invalid IP version." << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
     hints.ai_socktype = SOCK_DGRAM;
     hints.ai_protocol = 0;
     hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
@@ -64,7 +71,7 @@ int Server::listen()
         }
         char buffer[sizeof(ClientPacket)]; // We should only be receiving test_packets
         char control[1024];
-        struct sockaddr src_addr {};
+        struct sockaddr_in6 src_addr = {};
 
         struct iovec iov[1];
         iov[0].iov_base = buffer;
@@ -99,10 +106,10 @@ int Server::listen()
 void Server::handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t payload_len, timespec *incoming_timestamp)
 {
     ReflectorPacket reflector_packet = craftReflectorPacket(packet, sender_msg, incoming_timestamp);
-    sockaddr_in *sock = ((sockaddr_in *) sender_msg.msg_name);
+    char host[INET6_ADDRSTRLEN] = {};
+    uint16_t port;
+    parse_ip_address(sender_msg, &port, host, args.ip_version);
     // Overwrite and reuse the sender message with our own data and send it back, instead of creating a new one.
-    char *host = inet_ntoa(sock->sin_addr);
-    uint16_t port = ntohs(sock->sin_port);
     uint64_t server_receive_time, server_send_time, initial_send_time;
     int64_t client_server_delay;
     if (args.sync_time) {
