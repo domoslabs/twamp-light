@@ -40,6 +40,7 @@ Args parse_args(int argc, char **argv)
                    "which format to print the output in. Can be 'legacy', 'raw', 'clockcorrected'")
         ->default_str(args.print_format);
     app.add_option("--sep", args.sep, "The separator to use in the output.");
+    app.add_option("--ip", args.ip_version, "The IP version to use.");
     app.add_flag(
         "--sync{true}",
         args.sync_time,
@@ -59,8 +60,14 @@ Args parse_args(int argc, char **argv)
         ->check([&args](const std::string &str) {
             std::string ip;
             uint16_t port;
-            if (!parseIPPort(str, ip, port)) {
-                return "Address must be in the format IP:Port";
+            if (args.ip_version == IPV6) {
+                if (!parseIPv6Port(str, ip, port)) {
+                    return "Address must be in the format IP:Port";
+                }
+            } else if (args.ip_version == IPV4) {
+                if (!parseIPPort(str, ip, port)) {
+                    return "Address must be in the format IP:Port";
+                }
             }
             args.remote_hosts.push_back(ip);
             args.remote_ports.push_back(port);

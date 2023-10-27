@@ -73,8 +73,12 @@ find_program (BASH_PROGRAM bash)
 if (BASH_PROGRAM)
         add_test (NAME test_output 
                 COMMAND ${BASH_PROGRAM} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test.sh)
+        add_test (NAME test_output_ipv6 
+                COMMAND ${BASH_PROGRAM} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_ipv6.sh)        
         add_test (NAME test_memory 
                 COMMAND ${BASH_PROGRAM} ${CMAKE_CURRENT_SOURCE_DIR}/tests/valgrind_test.sh)
+        add_test (NAME test_memory_ipv6 
+                COMMAND ${BASH_PROGRAM} ${CMAKE_CURRENT_SOURCE_DIR}/tests/valgrind_test_ipv6.sh)
 endif()
         
 install(TARGETS ${CLIENT_TARGET} ${SERVER_TARGET} 
