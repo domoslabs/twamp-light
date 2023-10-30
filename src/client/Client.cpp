@@ -810,7 +810,7 @@ void Client::JsonLog(std::string json_output_file)
     int microseconds = Client::first_packet_sent_epoch_nanoseconds % 1000000000;
     auto now_as_tm_date = std::gmtime(&first_sent_seconds);
     char first_packet_sent_date[80];
-    strftime(first_packet_sent_date, sizeof(first_packet_sent_date) - 11, "%Y-%m-%dT%H:%M:%S", now_as_tm_date);
+    strftime(first_packet_sent_date, sizeof(first_packet_sent_date), "%Y-%m-%dT%H:%M:%S", now_as_tm_date);
     // Add the microseconds back in:
     char first_packet_sent_date_with_microseconds[91];
     sprintf(first_packet_sent_date_with_microseconds, "%s.%06dZ", first_packet_sent_date, microseconds);
