@@ -8,7 +8,12 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wextra -Wall -O0 -g")
 # set(CMAKE_CXX_FLAGS_RELEASE "-Werror -O2")
 include(cmake/getversion.cmake)
 
-option(USE_ASAN         "Build with address-sanitizer" OFF)
+option(USE_ASAN "Build with address-sanitizer" OFF)
+option(RUN_TESTS "Build and run tests" ON)
+
+if (RUN_TESTS)
+  enable_testing()
+endif ()
 
 if (USE_ASAN)
   string( TOLOWER "${CMAKE_BUILD_TYPE}" buildtype_lower)
@@ -31,6 +36,7 @@ set(COMMON_SOURCES
         src/TimeSync.cpp
         include/TimeSync.h
         include/Counter.h
+        include/json.hpp
 )
 
 set(CLIENT_TARGET twamp-light-client)
@@ -63,6 +69,18 @@ target_include_directories(
         ${CLIENT_TARGET} PRIVATE
 )
 
+find_program (BASH_PROGRAM bash)
+if (BASH_PROGRAM)
+        add_test (NAME test_output 
+                COMMAND ${BASH_PROGRAM} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test.sh)
+        add_test (NAME test_output_ipv6 
+                COMMAND ${BASH_PROGRAM} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_ipv6.sh)        
+        add_test (NAME test_memory 
+                COMMAND ${BASH_PROGRAM} ${CMAKE_CURRENT_SOURCE_DIR}/tests/valgrind_test.sh)
+        add_test (NAME test_memory_ipv6 
+                COMMAND ${BASH_PROGRAM} ${CMAKE_CURRENT_SOURCE_DIR}/tests/valgrind_test_ipv6.sh)
+endif()
+        
 install(TARGETS ${CLIENT_TARGET} ${SERVER_TARGET} 
         RUNTIME DESTINATION bin)
 

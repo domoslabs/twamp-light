@@ -54,51 +54,45 @@
 #define COUNTER_FORCE_INLINE inline __attribute__((always_inline))
 #endif // _MSC_VER
 
-
 //------------------------------------------------------------------------------
 // Counter
 
-template<typename T, unsigned TkBits> class Counter
-{
-public:
+template <typename T, unsigned TkBits> class Counter {
+  public:
     typedef Counter<T, TkBits> ThisType;
     typedef T ValueType;
     typedef typename std::make_signed<ValueType>::type SignedType;
 
-    static const unsigned kBits = TkBits; ///< Number of data bits
-    static const T kMSB = (T)1 << (TkBits - 1); ///< Most Significant Bit
+    static const unsigned kBits = TkBits;        ///< Number of data bits
+    static const T kMSB = (T) 1 << (TkBits - 1); ///< Most Significant Bit
 
     /// Generate a bit mask with 1s for each data bit
     /// The mask gets optimized away when compiler optimizations are enabled
-    static const T kMask = static_cast<T>(-(int64_t)1) >> (sizeof(T) * 8 - kBits);
+    static const T kMask = static_cast<T>(-(int64_t) 1) >> (sizeof(T) * 8 - kBits);
 
     /// Counter value
     T Value;
 
-
     //--------------------------------------------------------------------------
     // Assignment
 
-    Counter(T value = 0)
-            : Value(value & kMask)
+    Counter(T value = 0) : Value(value & kMask)
     {
     }
-    Counter(const ThisType& b)
-            : Value(b.Value)
+    Counter(const ThisType &b) : Value(b.Value)
     {
     }
 
-    ThisType& operator=(T value)
+    ThisType &operator=(T value)
     {
         Value = value & kMask;
         return *this;
     }
-    ThisType& operator=(const ThisType b)
+    ThisType &operator=(const ThisType b)
     {
         Value = b.Value;
         return *this;
     }
-
 
     //--------------------------------------------------------------------------
     // Accessors
@@ -109,19 +103,18 @@ public:
         return Value;
     }
 
-
     //--------------------------------------------------------------------------
     // Increment
 
     /// Pre-increment
-    COUNTER_FORCE_INLINE ThisType& operator++()
+    COUNTER_FORCE_INLINE ThisType &operator++()
     {
         Value = (Value + 1) & kMask;
         return *this;
     }
 
     /// Pre-decrement
-    COUNTER_FORCE_INLINE ThisType& operator--()
+    COUNTER_FORCE_INLINE ThisType &operator--()
     {
         Value = (Value - 1) & kMask;
         return *this;
@@ -143,11 +136,10 @@ public:
         return oldValue;
     }
 
-
     //--------------------------------------------------------------------------
     // Addition
 
-    COUNTER_FORCE_INLINE ThisType& operator+=(const ThisType b)
+    COUNTER_FORCE_INLINE ThisType &operator+=(const ThisType b)
     {
         Value = (Value + b.Value) & kMask;
         return *this;
@@ -158,7 +150,7 @@ public:
         return Value + b.Value; // Implicit mask
     }
 
-    COUNTER_FORCE_INLINE ThisType& operator-=(const ThisType b)
+    COUNTER_FORCE_INLINE ThisType &operator-=(const ThisType b)
     {
         Value = (Value - b.Value) & kMask;
         return *this;
@@ -168,7 +160,6 @@ public:
     {
         return Value - b.Value; // Implicit mask
     }
-
 
     //--------------------------------------------------------------------------
     // Comparison
@@ -203,7 +194,6 @@ public:
         return d >= kMSB;
     }
 
-
     //--------------------------------------------------------------------------
     // Counter Compression (Truncation) and Re-Expansion
 
@@ -220,8 +210,7 @@ public:
     */
 
     /// Compress to smaller counter by truncating
-    template<class SmallerT>
-    COUNTER_FORCE_INLINE SmallerT Truncate() const
+    template <class SmallerT> COUNTER_FORCE_INLINE SmallerT Truncate() const
     {
         static_assert(SmallerT::kBits < kBits, "Smaller type must be smaller");
 
@@ -232,11 +221,10 @@ public:
     /// Expand from truncated counter
     /// Bias > 0 can be used to accept values farther in the past
     /// Bias < 0 can be used to accept values farther in the future
-    template<class SmallerT>
-    static COUNTER_FORCE_INLINE ThisType ExpandFromTruncatedWithBias(
-            const ThisType recent,
-            const SmallerT smaller,
-            const SignedType bias)
+    template <class SmallerT>
+    static COUNTER_FORCE_INLINE ThisType ExpandFromTruncatedWithBias(const ThisType recent,
+                                                                     const SmallerT smaller,
+                                                                     const SignedType bias)
     {
         static_assert(SmallerT::kBits < kBits, "Smaller type must be smaller");
 
@@ -274,15 +262,12 @@ public:
         const T recentLow = recent.ToUnsigned() & SmallerT::kMask;
 
         // If recent - smaller would be negative:
-        if (recentLow < smaller.ToUnsigned())
-        {
+        if (recentLow < smaller.ToUnsigned()) {
             // If it is large enough to roll back a MSB:
             const T absDiff = smaller.ToUnsigned() - recentLow;
             if (absDiff >= static_cast<T>(SmallerT::kMSB - bias))
                 result -= static_cast<T>(SmallerT::kMSB) << 1;
-        }
-        else
-        {
+        } else {
             // If it is large enough to roll ahead a MSB:
             const T absDiff = recentLow - smaller.ToUnsigned();
             if (absDiff > static_cast<T>(SmallerT::kMSB + bias))
@@ -293,10 +278,8 @@ public:
     }
 
     /// Expand from truncated counter without any bias
-    template<class SmallerT>
-    static COUNTER_FORCE_INLINE ThisType ExpandFromTruncated(
-            const ThisType recent,
-            const SmallerT smaller)
+    template <class SmallerT>
+    static COUNTER_FORCE_INLINE ThisType ExpandFromTruncated(const ThisType recent, const SmallerT smaller)
     {
         static_assert(SmallerT::kBits < kBits, "Smaller type must be smaller");
 
@@ -319,9 +302,7 @@ public:
     // the field size.  Otherwise the extra sign handling above is not elided
     // by the compiler's optimizer:
 
-    static COUNTER_FORCE_INLINE ThisType ExpandFromTruncated(
-            const ThisType recent,
-            const Counter<uint32_t, 32> smaller)
+    static COUNTER_FORCE_INLINE ThisType ExpandFromTruncated(const ThisType recent, const Counter<uint32_t, 32> smaller)
     {
         static_assert(32 < kBits, "Smaller type must be smaller");
 
@@ -329,26 +310,21 @@ public:
         return recent + gap;
     }
 
-    static COUNTER_FORCE_INLINE ThisType ExpandFromTruncated(
-            const ThisType recent,
-            const Counter<uint16_t, 16> smaller)
+    static COUNTER_FORCE_INLINE ThisType ExpandFromTruncated(const ThisType recent, const Counter<uint16_t, 16> smaller)
     {
         static_assert(16 < kBits, "Smaller type must be smaller");
 
-        const int16_t gap = static_cast<int16_t>( smaller.Value - static_cast<uint16_t>(recent.Value) );
+        const int16_t gap = static_cast<int16_t>(smaller.Value - static_cast<uint16_t>(recent.Value));
         return recent + gap;
     }
 
-    static COUNTER_FORCE_INLINE ThisType ExpandFromTruncated(
-            const ThisType recent,
-            const Counter<uint8_t, 8> smaller)
+    static COUNTER_FORCE_INLINE ThisType ExpandFromTruncated(const ThisType recent, const Counter<uint8_t, 8> smaller)
     {
         static_assert(8 < kBits, "Smaller type must be smaller");
 
         const int8_t gap = static_cast<int8_t>(smaller.Value - static_cast<uint8_t>(recent.Value));
         return recent + gap;
     }
-
 
     static_assert(std::is_pod<T>::value, "Type must be a plain-old data type");
     static_assert(std::is_unsigned<T>::value, "Type must be unsigned");
@@ -359,7 +335,6 @@ public:
     static_assert(kMSB < kMask, "bugcheck");
     static_assert(kMSB != 0, "bugcheck");
 };
-
 
 /// Convenience declarations
 typedef Counter<uint64_t, 64> Counter64;
@@ -387,22 +362,25 @@ static_assert(sizeof(Counter64) == 8, "Unexpected padding");
 
     Preconditions: bytes > 0 && bytes < 8
 */
-COUNTER_FORCE_INLINE Counter64 CounterExpand(
-        uint64_t largest,
-        uint64_t partial,
-        unsigned bytes)
+COUNTER_FORCE_INLINE Counter64 CounterExpand(uint64_t largest, uint64_t partial, unsigned bytes)
 {
-    switch (bytes)
-    {
-        case 1: return Counter64::ExpandFromTruncated(largest, Counter8((uint8_t)partial));
-        case 2: return Counter64::ExpandFromTruncated(largest, Counter16((uint16_t)partial));
-        case 3: return Counter64::ExpandFromTruncated(largest, Counter24((uint32_t)partial));
-        case 4: return Counter64::ExpandFromTruncated(largest, Counter32((uint32_t)partial));
-        case 5: return Counter64::ExpandFromTruncated(largest, Counter40(partial));
-        case 6: return Counter64::ExpandFromTruncated(largest, Counter48(partial));
-        case 7: return Counter64::ExpandFromTruncated(largest, Counter56(partial));
-        default:
-            break;
+    switch (bytes) {
+    case 1:
+        return Counter64::ExpandFromTruncated(largest, Counter8((uint8_t) partial));
+    case 2:
+        return Counter64::ExpandFromTruncated(largest, Counter16((uint16_t) partial));
+    case 3:
+        return Counter64::ExpandFromTruncated(largest, Counter24((uint32_t) partial));
+    case 4:
+        return Counter64::ExpandFromTruncated(largest, Counter32((uint32_t) partial));
+    case 5:
+        return Counter64::ExpandFromTruncated(largest, Counter40(partial));
+    case 6:
+        return Counter64::ExpandFromTruncated(largest, Counter48(partial));
+    case 7:
+        return Counter64::ExpandFromTruncated(largest, Counter56(partial));
+    default:
+        break;
     }
 
     return 0;

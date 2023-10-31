@@ -9,18 +9,19 @@
 #include "utils.hpp"
 #include "TimeSync.h"
 
-struct Args{
+struct Args {
     std::string local_host;
     std::string local_port = "443";
     uint32_t num_samples = 0;
     uint8_t timeout = 0;
     uint8_t snd_tos = 0;
+    uint8_t ip_version = 4;
     bool sync_time = false;
     char sep = ',';
 };
 struct MetricData {
     std::string ip;
-    uint16_t sending_port= 0;
+    uint16_t sending_port = 0;
     uint16_t receiving_port = 0;
     uint16_t payload_length = 0;
     int64_t client_server_delay = 0;
@@ -29,22 +30,22 @@ struct MetricData {
     ReflectorPacket packet;
 };
 class Server {
-public:
-    Server(const Args& args);
+  public:
+    Server(const Args &args);
     ~Server();
 
     int listen();
-private:
+
+  private:
     int fd;
     bool header_printed = false;
 
-    TimeSynchronizer* timeSynchronizer = new TimeSynchronizer();
+    TimeSynchronizer *timeSynchronizer = new TimeSynchronizer();
 
     Args args;
-    void handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t payload_len);
-    void printMetrics(const MetricData& data);
-    ReflectorPacket craftReflectorPacket(ClientPacket *clientPacket, msghdr sender_msg);
+    void handleTestPacket(ClientPacket *packet, msghdr sender_msg, size_t payload_len, timespec *incoming_timestamp);
+    void printMetrics(const MetricData &data);
+    ReflectorPacket craftReflectorPacket(ClientPacket *clientPacket, msghdr sender_msg, timespec *incoming_timestamp);
 };
 
-
-#endif //TWAMP_LIGHT_SERVER_H
+#endif // TWAMP_LIGHT_SERVER_H

@@ -155,7 +155,6 @@
     Packet trip time = (Minimal one-way delay) + DD.
 */
 
-
 //------------------------------------------------------------------------------
 // Constants
 
@@ -186,53 +185,46 @@ static const unsigned kTime16ErrorBound = (1 << kTime16LostBits) * 2 - 1;
 /// Assumes that clocks drift 1 millisecond every 10 seconds
 static const uint64_t kDriftWindowUsec = 10 * 1000 * 1000; ///< 10 seconds
 
-
 //------------------------------------------------------------------------------
 // Types
 
 /// Use Counter23::Decompress to expand back to 64-bit counters
 typedef Counter<uint32_t, 23> Counter23;
 
-
 //------------------------------------------------------------------------------
 // WindowedMinTS24
 
 /// Windowed minimum in TS24 units
-class WindowedMinTS24
-{
-public:
-    WindowedMinTS24() {}
-
-    struct Sample
+class WindowedMinTS24 {
+  public:
+    WindowedMinTS24()
     {
+    }
+
+    struct Sample {
         /// Sample value
         Counter24 Value;
 
         /// Timestamp of data collection
         uint64_t Timestamp;
 
-
         /// Default values and initializing constructor
-        explicit Sample(Counter24 value = 0, uint64_t timestamp = 0)
-                : Value(value)
-                , Timestamp(timestamp)
+        explicit Sample(Counter24 value = 0, uint64_t timestamp = 0) : Value(value), Timestamp(timestamp)
         {
         }
 
         /// Check if a timeout expired
         inline bool TimeoutExpired(uint64_t now, uint64_t timeout)
         {
-            return (uint64_t)(now - Timestamp) > timeout;
+            return (uint64_t) (now - Timestamp) > timeout;
         }
     };
-
 
     /// Number of samples collected
     static const unsigned kSampleCount = 3;
 
     /// Sorted samples from smallest to largest
     Sample Samples[kSampleCount];
-
 
     /// Are there any samples?
     inline bool IsValid() const
@@ -253,19 +245,14 @@ public:
     }
 
     /// Update minimum with new value
-    void Update(
-            Counter24 value,
-            uint64_t timestamp,
-            const uint64_t windowLengthTime);
+    void Update(Counter24 value, uint64_t timestamp, const uint64_t windowLengthTime);
 };
-
 
 //------------------------------------------------------------------------------
 // TimeSynchronizer
 
-class TimeSynchronizer
-{
-public:
+class TimeSynchronizer {
+  public:
     /**
         OnPeerMinDeltaTS24()
 
@@ -281,7 +268,7 @@ public:
     /// Convert local time in microseconds to a 24-bit datagram timestamp
     static inline uint32_t LocalTimeToDatagramTS24(uint64_t localUsec)
     {
-        return (uint32_t)(localUsec >> kTime23LostBits) & 0x00ffffff;
+        return (uint32_t) (localUsec >> kTime23LostBits) & 0x00ffffff;
     }
 
     /**
@@ -298,10 +285,7 @@ public:
         Returns estimated one way delay (OWD) in microseconds for this datagram.
         Returns 0 if OWD is unavailable.
     */
-    unsigned OnAuthenticatedDatagramTimestamp(
-            Counter24 remoteSendTS24,
-            uint64_t localRecvUsec);
-
+    unsigned OnAuthenticatedDatagramTimestamp(Counter24 remoteSendTS24, uint64_t localRecvUsec);
 
     /// Get the minimum TS24 (receipt - send) delta seen in the past interval
     inline Counter24 GetMinDeltaTS24() const
@@ -330,21 +314,18 @@ public:
             return 0;
         }
 
-        const uint16_t localTS16 = (uint16_t)(localUsec >> kTime16LostBits);
-        const uint16_t deltaTS16 = (uint16_t)(RemoteTimeDeltaUsec >> kTime16LostBits);
+        const uint16_t localTS16 = (uint16_t) (localUsec >> kTime16LostBits);
+        const uint16_t deltaTS16 = (uint16_t) (RemoteTimeDeltaUsec >> kTime16LostBits);
 
         return localTS16 + deltaTS16;
     }
 
     /// Returns local time given local time from packet
-    inline uint64_t FromLocalTime16(
-            uint64_t localUsec,
-            Counter16 timestamp16)
+    inline uint64_t FromLocalTime16(uint64_t localUsec, Counter16 timestamp16)
     {
-        return Counter64::ExpandFromTruncatedWithBias(
-                localUsec >> kTime16LostBits,
-                timestamp16,
-                kTime16Bias).ToUnsigned() << kTime16LostBits;
+        return Counter64::ExpandFromTruncatedWithBias(localUsec >> kTime16LostBits, timestamp16, kTime16Bias)
+                   .ToUnsigned()
+               << kTime16LostBits;
     }
 
     /// Returns 23-bit remote time field to send in a packet
@@ -354,24 +335,21 @@ public:
             return 0;
         }
 
-        const Counter23 localTS23 = (uint32_t)(localUsec >> kTime23LostBits);
+        const Counter23 localTS23 = (uint32_t) (localUsec >> kTime23LostBits);
         const Counter23 deltaTS23 = RemoteTimeDeltaUsec >> kTime23LostBits;
 
         return (localTS23 + deltaTS23).ToUnsigned();
     }
 
     /// Returns local time given remote time from packet
-    inline uint64_t To64BitUSec(
-            uint64_t localUsec,
-            Counter23 timestamp23)
+    inline uint64_t To64BitUSec(uint64_t localUsec, Counter23 timestamp23)
     {
-        return Counter64::ExpandFromTruncatedWithBias(
-                localUsec >> kTime23LostBits,
-                timestamp23,
-                kTime23Bias).ToUnsigned() << kTime23LostBits;
+        return Counter64::ExpandFromTruncatedWithBias(localUsec >> kTime23LostBits, timestamp23, kTime23Bias)
+                   .ToUnsigned()
+               << kTime23LostBits;
     }
 
-protected:
+  protected:
     /// Synchronized?
     std::atomic<bool> Synchronized = ATOMIC_VAR_INIT(false);
 
@@ -390,7 +368,6 @@ protected:
 
     /// Is peer update received yet?
     bool GotPeerUpdate = false;
-
 
     /// Recalculate MinimumOneWayDelayUsec and RemoteTimeDeltaUsec
     void Recalculate();

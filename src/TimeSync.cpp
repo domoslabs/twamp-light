@@ -30,22 +30,15 @@
 #include <TimeSync.h>
 #include <iostream>
 
-
 //------------------------------------------------------------------------------
 // WindowedMinTS24
 
-void WindowedMinTS24::Update(
-        Counter24 value,
-        uint64_t timestamp,
-        const uint64_t windowLengthTime)
+void WindowedMinTS24::Update(Counter24 value, uint64_t timestamp, const uint64_t windowLengthTime)
 {
     const Sample sample(value, timestamp);
 
     // On the first sample, new best sample, or if window length has expired:
-    if (!IsValid() ||
-        value <= Samples[0].Value ||
-        Samples[2].TimeoutExpired(sample.Timestamp, windowLengthTime))
-    {
+    if (!IsValid() || value <= Samples[0].Value || Samples[2].TimeoutExpired(sample.Timestamp, windowLengthTime)) {
         Reset(sample);
         return;
     }
@@ -57,16 +50,12 @@ void WindowedMinTS24::Update(
         Samples[2] = sample;
 
     // Expire best if it has been the best for a long time
-    if (Samples[0].TimeoutExpired(sample.Timestamp, windowLengthTime))
-    {
+    if (Samples[0].TimeoutExpired(sample.Timestamp, windowLengthTime)) {
         // Also expire the next best if needed
-        if (Samples[1].TimeoutExpired(sample.Timestamp, windowLengthTime))
-        {
+        if (Samples[1].TimeoutExpired(sample.Timestamp, windowLengthTime)) {
             Samples[0] = Samples[2];
             Samples[1] = sample;
-        }
-        else
-        {
+        } else {
             Samples[0] = Samples[1];
             Samples[1] = Samples[2];
         }
@@ -75,21 +64,16 @@ void WindowedMinTS24::Update(
     }
 
     // Quarter of window has gone by without a better value - Use the second-best
-    if (Samples[1].Value == Samples[0].Value &&
-        Samples[1].TimeoutExpired(sample.Timestamp, windowLengthTime / 4))
-    {
+    if (Samples[1].Value == Samples[0].Value && Samples[1].TimeoutExpired(sample.Timestamp, windowLengthTime / 4)) {
         Samples[2] = Samples[1] = sample;
         return;
     }
 
     // Half the window has gone by without a better value - Use the third-best one
-    if (Samples[2].Value == Samples[1].Value &&
-        Samples[2].TimeoutExpired(sample.Timestamp, windowLengthTime / 2))
-    {
+    if (Samples[2].Value == Samples[1].Value && Samples[2].TimeoutExpired(sample.Timestamp, windowLengthTime / 2)) {
         Samples[2] = sample;
     }
 }
-
 
 //------------------------------------------------------------------------------
 // TimeSynchronizer
@@ -102,11 +86,9 @@ void TimeSynchronizer::OnPeerMinDeltaTS24(Counter24 minDeltaTS24)
     Recalculate();
 }
 
-unsigned TimeSynchronizer::OnAuthenticatedDatagramTimestamp(
-        Counter24 remoteSendTS24,
-        uint64_t localRecvUsec)
+unsigned TimeSynchronizer::OnAuthenticatedDatagramTimestamp(Counter24 remoteSendTS24, uint64_t localRecvUsec)
 {
-    const Counter24 localTS24 = (uint32_t)(localRecvUsec >> kTime23LostBits);
+    const Counter24 localTS24 = (uint32_t) (localRecvUsec >> kTime23LostBits);
 
     // OWD_i + ClockDelta(L-R)_i = Local Receive Time - Remote Send Time
     const Counter24 deltaTS24 = localTS24 - remoteSendTS24;
@@ -121,8 +103,7 @@ unsigned TimeSynchronizer::OnAuthenticatedDatagramTimestamp(
     // Set to 0 if trip time is not available
     unsigned networkTripUsec = 0;
 
-    if (IsSynchronized())
-    {
+    if (IsSynchronized()) {
         // This is equivalent to the shortest RTT/2 seen so far by any pair of packets,
         // meaning that it is the average of the upstream and downstream OWD.
         networkTripUsec = GetMinimumOneWayDelayUsec();
@@ -130,8 +111,7 @@ unsigned TimeSynchronizer::OnAuthenticatedDatagramTimestamp(
         // While the OWD is an estimate, the relative delay between that
         // smallest packet pair and the current datagram is actually precise:
         const Counter24 minDeltaTS24 = GetMinDeltaTS24();
-        if (deltaTS24 > minDeltaTS24)
-        {
+        if (deltaTS24 > minDeltaTS24) {
             const Counter24 relativeTS24 = deltaTS24 - minDeltaTS24;
             networkTripUsec += relativeTS24.ToUnsigned() << kTime23LostBits;
         }
