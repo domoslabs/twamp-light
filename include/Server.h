@@ -13,7 +13,7 @@ struct Args {
     std::string local_host;
     std::string local_port = "443";
     uint32_t num_samples = 0;
-    uint8_t timeout = 0;
+    uint32_t timeout = 0;
     uint8_t snd_tos = 0;
     uint8_t ip_version = 4;
     bool sync_time = false;
