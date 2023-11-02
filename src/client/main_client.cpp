@@ -86,10 +86,12 @@ Args parse_args(int argc, char **argv)
         std::cout << ", git describe: " << std::string(TWAMP_GIT_DESCRIBE);
         std::cout << ",  submodules: qoo-c (" << std::string(QOO_GIT_DESCRIBE) << ") ";
         std::cout << "t-digest-c (" << std::string(TDIGEST_GIT_DESCRIBE) << ")" << std::endl;
+        fflush(stdout);
         std::exit(EXIT_SUCCESS);
     } else { // i dont't know how to override addresses options required() modifier
         if (ipPortStrs.empty()) {
             std::cout << "Address must be in the format IP:Port\n";
+            fflush(stdout);
             exit(EXIT_SUCCESS);
         }
     }

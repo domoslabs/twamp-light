@@ -335,6 +335,7 @@ void Client::printRawDataHeader()
               << "server_receive_epoch_nanoseconds" << args.sep << "server_send_epoch_nanoseconds" << args.sep
               << "client_receive_epoch_nanoseconds"
               << "\n";
+    fflush(stdout);
 }
 
 int64_t calculate_correction(RawData **first_entry, RawData **last_entry)
@@ -640,6 +641,7 @@ void Client::printReflectorPacket(ReflectorPacket *reflectorPacket,
 
     if (args.print_RTT_only) {
         std::cout << std::fixed << (double) timeData.rtt / 1e-6 << "\n";
+        fflush(stdout);
     } else {
         printMetrics(data);
     }
@@ -654,7 +656,7 @@ void Client::printHeader()
                   << args.sep << "IntD" << args.sep << "FWD" << args.sep << "BWD" << args.sep << "PLEN" << args.sep
                   << "LOSS"
                   << "\n";
-    } else if (args.print_format == "raw") {
+        } else if (args.print_format == "raw") {
         std::cout << "packet_id" << args.sep << "payload_len" << args.sep << "client_send_epoch_nanoseconds" << args.sep
                   << "server_receive_epoch_nanoseconds" << args.sep << "server_send_epoch_nanoseconds" << args.sep
                   << "client_receive_epoch_nanoseconds"
@@ -664,6 +666,7 @@ void Client::printHeader()
                   << "delay_to_server" << args.sep << "delay_to_server_response" << args.sep << "delay_round_trip"
                   << "\n";
     }
+    fflush(stdout);
 }
 
 void Client::printMetrics(const MetricData &data)
@@ -688,6 +691,7 @@ void Client::printMetrics(const MetricData &data)
               << args.sep << (double) data.internal_delay * 1e-6 << args.sep << (double) data.client_server_delay * 1e-6
               << args.sep << (double) data.server_client_delay * 1e-6 << args.sep << data.payload_length << args.sep
               << data.packet_loss << "\n";
+    fflush(stdout);
 }
 
 void Client::print_lost_packet(uint32_t packet_id, uint64_t initial_send_time, uint16_t payload_len)
@@ -725,6 +729,7 @@ void Client::print_lost_packet(uint32_t packet_id, uint64_t initial_send_time, u
               << args.sep
               //<< data.packet_loss
               << "\n";
+    fflush(stdout);
 }
 
 template <typename Func> void Client::printSummaryLine(const std::string &label, Func func)
@@ -734,6 +739,7 @@ template <typename Func> void Client::printSummaryLine(const std::string &label,
     std::cout << func(stats_client_server) << " s      ";
     std::cout << func(stats_server_client) << " s      ";
     std::cout << func(stats_internal) << " s\n";
+    fflush(stdout);
 }
 
 void Client::printStats(int packets_sent)
@@ -751,6 +757,7 @@ void Client::printStats(int packets_sent)
     std::cout << "Packets lost: " << sqa_stats_get_number_of_lost_packets(Client::stats_RTT) << "\n";
     std::cout << "Packet loss: " << sqa_stats_get_loss_percentage(Client::stats_RTT) << "%\n";
     std::cout << "           RTT             FWD             BWD             Internal\n";
+    fflush(stdout);
 
     auto printPercentileLine = [&](const std::string &label, double percentile) {
         std::cout << " " << std::left << std::setw(10) << label << std::setprecision(6);
@@ -758,6 +765,7 @@ void Client::printStats(int packets_sent)
         std::cout << sqa_stats_get_percentile(Client::stats_client_server, percentile) << " s      ";
         std::cout << sqa_stats_get_percentile(Client::stats_server_client, percentile) << " s      ";
         std::cout << sqa_stats_get_percentile(Client::stats_internal, percentile) << " s\n";
+        fflush(stdout);
     };
 
     printSummaryLine("mean:", sqa_stats_get_mean);
