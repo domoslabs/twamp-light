@@ -341,7 +341,7 @@ struct msghdr make_msghdr(
 }
 
 // Function to handle both IPv4 and IPv6
-void parse_ip_address(struct msghdr sender_msg, uint16_t *port, char *host, u_int8_t ip_version)
+void parse_ip_address(struct msghdr sender_msg, uint16_t *port, char *host, uint8_t ip_version)
 {
     if (ip_version == IPV4) {
         sockaddr_in *sock = (sockaddr_in *) sender_msg.msg_name;

@@ -844,7 +844,7 @@ void Client::JsonLog(std::string json_output_file)
     logData["intermediate_nodes"] = nlohmann::json::array();
     logData["start_node"] = {{"ip", "localhost"}, {"port", args.local_port}};
     // Loop through the list of remote hosts and ports
-    for (uint i = 0; i < args.remote_hosts.size(); ++i) {
+    for (uint32_t i = 0; i < args.remote_hosts.size(); ++i) {
         logData["intermediate_nodes"].push_back(
             {{"ip", args.remote_hosts[i]}, {"port", args.remote_ports[i]}, {"label", "1"}});
         logData["intermediate_nodes"].push_back(
