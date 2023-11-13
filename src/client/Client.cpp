@@ -175,8 +175,8 @@ void Client::runReceiverThread()
 {
     uint32_t index = 0;
     time_t time_of_last_received_packet = time(NULL);
-    while ((args.num_samples == 0 || sending_completed == 0 ||
-            (index < args.num_samples * args.remote_hosts.size() &&
+    while ((args.num_samples == 0 || (sending_completed == 0 &&
+            index < args.num_samples * args.remote_hosts.size() &&
              time(NULL) - time_of_last_received_packet <
                  args.timeout))) // run forever if num_samples is 0, otherwise run until num_samples is reached
     {
