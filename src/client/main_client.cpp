@@ -109,14 +109,16 @@ int main(int argc, char **argv)
     std::thread receiver_thread(&Client::runReceiverThread, &client);
     std::thread sender_thread(&Client::runSenderThread, &client);
     client.printHeader();
-    client.runCollatorThread();
+    if (args.print_format != "legacy") {
+        client.runCollatorThread();
+    }
     sender_thread.join();
     receiver_thread.join();
     int packets_sent = client.getSentPackets();
-    if (args.print_digest) {
+    if (args.print_digest && args.print_format != "legacy") {
         client.printStats(packets_sent);
     }
-    if (!args.json_output_file.empty()) {
+    if (!args.json_output_file.empty() && args.print_format != "legacy") {
         client.JsonLog(args.json_output_file);
     }
     return 0;
