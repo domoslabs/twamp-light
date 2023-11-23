@@ -129,7 +129,7 @@ class Client {
     void printReflectorPacket(ReflectorPacket *reflectorPacket,
                               msghdr msghdr,
                               ssize_t payload_len,
-                              timespec *incoming_timestamp);
+                              uint64_t incoming_timestamp_nanoseconds);
 
     template <typename Func> void printSummaryLine(const std::string &label, Func func);
 

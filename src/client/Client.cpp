@@ -457,7 +457,7 @@ bool Client::awaitAndHandleResponse()
     iov.iov_base = buffer;
     iov.iov_len = sizeof(buffer);
 
-    timespec incoming_timestamp;
+    timespec incoming_timestamp = {0,0};
     timespec *incoming_timestamp_ptr = &incoming_timestamp;
 
     struct msghdr incoming_msg = make_msghdr(&iov, 1, &src_addr, sizeof(src_addr), control, sizeof(control));
@@ -619,16 +619,16 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket,
     enqueue_observation(obs2);
     enqueue_observation(obs1);
     if (args.print_format == "legacy") {
-        printReflectorPacket(reflectorPacket, msghdr, payload_len, incoming_timestamp);
+        printReflectorPacket(reflectorPacket, msghdr, payload_len, incoming_timestamp_nanoseconds);
     }
 }
 
 void Client::printReflectorPacket(ReflectorPacket *reflectorPacket,
                                   msghdr msghdr,
                                   ssize_t payload_len,
-                                  timespec *incoming_timestamp)
+                                  uint64_t incoming_timestamp_nanoseconds)
 {
-    uint64_t client_receive_time = incoming_timestamp->tv_sec * 1000000000 + incoming_timestamp->tv_nsec;
+    uint64_t client_receive_time = incoming_timestamp_nanoseconds;
     IPHeader ipHeader = get_ip_header(msghdr);
     char host[INET6_ADDRSTRLEN] = {0};
     uint16_t port;
