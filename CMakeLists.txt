@@ -10,6 +10,10 @@ include(cmake/getversion.cmake)
 
 option(USE_ASAN "Build with address-sanitizer" OFF)
 option(RUN_TESTS "Build and run tests" ON)
+option(USE_LEGACY_TIMESTAMP_IN_CLIENT OFF)
+if (USE_LEGACY_TIMESTAMP_IN_CLIENT)
+  add_definitions(-DKERNEL_TIMESTAMP_DISABLED_IN_CLIENT)
+endif ()
 
 if (RUN_TESTS)
   enable_testing()

@@ -463,7 +463,10 @@ bool Client::awaitAndHandleResponse()
     struct msghdr incoming_msg = make_msghdr(&iov, 1, &src_addr, sizeof(src_addr), control, sizeof(control));
 
     ssize_t count = recvmsg(fd, &incoming_msg, MSG_WAITALL);
+#ifdef KERNEL_TIMESTAMP_DISABLED_IN_CLIENT
+#else
     get_kernel_timestamp(incoming_msg, incoming_timestamp_ptr);
+#endif
     if (count == -1) {
         std::cerr << strerror(errno) << std::endl;
         return false;
