@@ -100,7 +100,8 @@ class Client {
   private:
     int fd = -1;
     int sent_packets = 0;
-    int sending_completed = 0;
+    uint32_t last_received_packet_id = -1;
+    uint64_t sending_completed = 0;
     int collator_finished = 0;
     bool header_printed = false;
     sem_t observation_semaphore;
