@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.0)
 project(twamp-light)
 
 set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wextra -Wall -Werror")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wextra -Wall -Werror")
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wextra -Wall -O0 -g")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wextra -Wall -O0 -g")
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-psabi" )
@@ -63,7 +65,7 @@ src/server/main_server.cpp
 ${COMMON_SOURCES}
 )
 
-target_link_libraries(${CLIENT_TARGET} PRIVATE qoo ${EXTRA_LIBS} Threads::Threads)
+target_link_libraries(${CLIENT_TARGET} PRIVATE qoo_static ${EXTRA_LIBS} Threads::Threads)
 target_link_libraries(${SERVER_TARGET} PRIVATE ${EXTRA_LIBS})
 target_include_directories(
         ${CLIENT_TARGET} PRIVATE
