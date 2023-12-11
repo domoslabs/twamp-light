@@ -154,6 +154,7 @@ void Client::runSenderThread()
     while (args.num_samples == 0 || index < args.num_samples) {
         size_t payload_len = *select_randomly(args.payload_lens.begin(), args.payload_lens.end(), args.seed);
         int delay = std::max((double) std::min((double) d(gen), 10000000.0), 0.0);
+        usleep(delay);
         Timestamp sent_time = sendPacket(index, payload_len);
         if (first_packet_sent_epoch_nanoseconds == 0) {
             first_packet_sent_epoch_nanoseconds = timestamp_to_nsec(&sent_time);
@@ -163,28 +164,22 @@ void Client::runSenderThread()
             make_qed_observation(ObservationPoints::CLIENT_SEND, timestamp_to_nsec(&sent_time), index, payload_len);
         enqueue_observation(obs);
         index++;
-        usleep(delay);
     }
-    sent_packets = index;
-    sending_completed = 1;
+    this->sent_packets = index;
+    this->sending_completed = time(NULL);
 }
 
 /* Receives and processes the reflected
     packets from the server side.*/
 void Client::runReceiverThread()
 {
-    uint32_t index = 0;
-    time_t time_of_last_received_packet = time(NULL);
-    while ((args.num_samples == 0 || (sending_completed == 0 &&
-            index < args.num_samples * args.remote_hosts.size() &&
-             time(NULL) - time_of_last_received_packet <
-                 args.timeout))) // run forever if num_samples is 0, otherwise run until num_samples is reached
+    /* run forever if num_samples is 0, 
+    otherwise run until all packets have been received (or timed out) */
+    while ((args.num_samples == 0 || 
+    this->sending_completed == 0 ||
+    (this->last_received_packet_id < (args.num_samples - 1) && time(NULL) - this->sending_completed > args.timeout))) 
     {
-        bool response = awaitAndHandleResponse();
-        if (response) {
-            index++;
-            time_of_last_received_packet = time(NULL);
-        }
+        awaitAndHandleResponse();
     }
 }
 
@@ -457,15 +452,18 @@ bool Client::awaitAndHandleResponse()
     iov.iov_base = buffer;
     iov.iov_len = sizeof(buffer);
 
-    timespec incoming_timestamp;
+    timespec incoming_timestamp = {0,0};
     timespec *incoming_timestamp_ptr = &incoming_timestamp;
 
     struct msghdr incoming_msg = make_msghdr(&iov, 1, &src_addr, sizeof(src_addr), control, sizeof(control));
 
     ssize_t count = recvmsg(fd, &incoming_msg, MSG_WAITALL);
+#ifdef KERNEL_TIMESTAMP_DISABLED_IN_CLIENT
+#else
     get_kernel_timestamp(incoming_msg, incoming_timestamp_ptr);
+#endif
     if (count == -1) {
-        std::cerr << strerror(errno) << std::endl;
+        //std::cerr << strerror(errno) << std::endl;
         return false;
     } else if (incoming_msg.msg_flags & MSG_TRUNC) {
         return false;
@@ -602,7 +600,7 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket,
     // uint16_t  port = ntohs(sock->sin_port);
     // uint16_t local_port = atoi(args.local_port.c_str());
     uint32_t packet_id = ntohl(reflectorPacket->seq_number);
-
+    this->last_received_packet_id = packet_id;
     struct qed_observation *obs1 =
         make_qed_observation(ObservationPoints::CLIENT_RECEIVE, incoming_timestamp_nanoseconds, packet_id, payload_len);
     struct qed_observation *obs2 = make_qed_observation(ObservationPoints::SERVER_RECEIVE,
@@ -619,16 +617,16 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket,
     enqueue_observation(obs2);
     enqueue_observation(obs1);
     if (args.print_format == "legacy") {
-        printReflectorPacket(reflectorPacket, msghdr, payload_len, incoming_timestamp);
+        printReflectorPacket(reflectorPacket, msghdr, payload_len, incoming_timestamp_nanoseconds);
     }
 }
 
 void Client::printReflectorPacket(ReflectorPacket *reflectorPacket,
                                   msghdr msghdr,
                                   ssize_t payload_len,
-                                  timespec *incoming_timestamp)
+                                  uint64_t incoming_timestamp_nanoseconds)
 {
-    uint64_t client_receive_time = incoming_timestamp->tv_sec * 1000000000 + incoming_timestamp->tv_nsec;
+    uint64_t client_receive_time = incoming_timestamp_nanoseconds;
     IPHeader ipHeader = get_ip_header(msghdr);
     char host[INET6_ADDRSTRLEN] = {0};
     uint16_t port;

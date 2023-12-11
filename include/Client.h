@@ -100,7 +100,8 @@ class Client {
   private:
     int fd = -1;
     int sent_packets = 0;
-    int sending_completed = 0;
+    uint32_t last_received_packet_id = -1;
+    uint64_t sending_completed = 0;
     int collator_finished = 0;
     bool header_printed = false;
     sem_t observation_semaphore;
@@ -129,7 +130,7 @@ class Client {
     void printReflectorPacket(ReflectorPacket *reflectorPacket,
                               msghdr msghdr,
                               ssize_t payload_len,
-                              timespec *incoming_timestamp);
+                              uint64_t incoming_timestamp_nanoseconds);
 
     template <typename Func> void printSummaryLine(const std::string &label, Func func);
 

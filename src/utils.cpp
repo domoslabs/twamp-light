@@ -80,10 +80,10 @@ void timestamp_to_timespec(const Timestamp *ts, struct timespec *tv)
 
 Timestamp get_timestamp()
 {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
+    struct timespec tspec;
+    clock_gettime(CLOCK_REALTIME, &tspec);
     Timestamp ts;
-    timeval_to_timestamp(&tv, &ts);
+    timespec_to_timestamp(&tspec, &ts);
     return ts;
 }
 
@@ -180,11 +180,16 @@ void get_kernel_timestamp(msghdr incoming_msg, timespec *incoming_timestamp)
             continue;
         switch (cm->cmsg_type) {
         case SO_TIMESTAMPNS:
-            memcpy(incoming_timestamp, CMSG_DATA(cm), sizeof(struct timespec));
-            break;
         case SO_TIMESTAMPING:
             memcpy(incoming_timestamp, CMSG_DATA(cm), sizeof(struct timespec));
             break;
+        case SO_TIMESTAMP: {
+            struct timeval tv;
+            memcpy(&tv, CMSG_DATA(cm), sizeof(struct timeval));
+            incoming_timestamp->tv_sec = tv.tv_sec;
+            incoming_timestamp->tv_nsec = tv.tv_usec * 1000; // Convert microseconds to nanoseconds
+            break;
+        }
         default:
             /* Ignore other cmsg options */
             break;
@@ -200,11 +205,10 @@ void set_socket_options(int socket, uint8_t ip_ttl, uint8_t timeout_secs)
 
     /* Set Timeout */
     struct timeval timeout = {timeout_secs, 0}; // set timeout for 2 seconds
-
     /* Enable socket timestamping and set the timestamp resolution to nanoseconds */
     int flags = 1;
     if (setsockopt(socket, SOL_SOCKET, SO_TIMESTAMPNS, &flags, sizeof(flags)) < 0)
-        printf("ERROR: setsockopt SO_TIMESTAMPING\n");
+        printf("ERROR: setsockopt SO_TIMESTAMPNS\n");
 
         /* Set receive UDP message timeout value */
 #ifdef SO_RCVTIMEO
