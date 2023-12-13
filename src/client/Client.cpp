@@ -155,14 +155,19 @@ void Client::runSenderThread()
         size_t payload_len = *select_randomly(args.payload_lens.begin(), args.payload_lens.end(), args.seed);
         int delay = std::max((double) std::min((double) d(gen), 10000000.0), 0.0);
         usleep(delay);
-        Timestamp sent_time = sendPacket(index, payload_len);
-        if (first_packet_sent_epoch_nanoseconds == 0) {
-            first_packet_sent_epoch_nanoseconds = timestamp_to_nsec(&sent_time);
-        }
-        last_packet_sent_epoch_nanoseconds = timestamp_to_nsec(&sent_time);
-        struct qed_observation *obs =
+        try {
+            Timestamp sent_time = sendPacket(index, payload_len);
+            if (first_packet_sent_epoch_nanoseconds == 0) {
+                first_packet_sent_epoch_nanoseconds = timestamp_to_nsec(&sent_time);
+            }
+            last_packet_sent_epoch_nanoseconds = timestamp_to_nsec(&sent_time);
+            struct qed_observation *obs =
             make_qed_observation(ObservationPoints::CLIENT_SEND, timestamp_to_nsec(&sent_time), index, payload_len);
-        enqueue_observation(obs);
+            enqueue_observation(obs);
+        }   
+        catch (const std::exception& e) { // catch error from sendPacket
+            std::cerr << e.what() << std::endl;
+        }
         index++;
     }
     this->sent_packets = index;
