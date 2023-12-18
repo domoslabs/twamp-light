@@ -41,6 +41,7 @@ Args parse_args(int argc, char **argv)
         ->default_str(args.print_format);
     app.add_option("--sep", args.sep, "The separator to use in the output.");
     app.add_option("--ip", args.ip_version, "The IP version to use.");
+    app.add_option("--runtime", args.runtime, "Run for this number of seconds before terminating. This option overrides the -n (--num_samples) option.");
     app.add_flag(
         "--sync{true}",
         args.sync_time,
