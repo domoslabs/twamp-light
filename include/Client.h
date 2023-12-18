@@ -28,6 +28,7 @@ struct Args {
     uint32_t mean_inter_packet_delay = 200;
     uint32_t timeout = 10;
     uint32_t seed = 0;
+    uint32_t runtime = 0;
     char sep = ',';
     bool sync_time = false;
     bool print_digest = false;
@@ -102,6 +103,7 @@ class Client {
     int sent_packets = 0;
     uint32_t last_received_packet_id = -1;
     uint64_t sending_completed = 0;
+    uint64_t start_time = 0;
     int collator_finished = 0;
     bool header_printed = false;
     sem_t observation_semaphore;

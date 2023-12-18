@@ -22,6 +22,7 @@ using Clock = std::chrono::system_clock;
 Client::Client(const Args &args)
 {
     this->args = args;
+    this->start_time = time(NULL);
     // Construct remote socket address
     struct addrinfo hints {};
     memset(&hints, 0, sizeof(hints));
@@ -151,7 +152,7 @@ void Client::runSenderThread()
     std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
     std::exponential_distribution<> d(1.0 /
                                       (args.mean_inter_packet_delay * 1000)); // Lambda is 1.0/mean (in microseconds)
-    while (args.num_samples == 0 || index < args.num_samples) {
+    while (args.num_samples == 0 || index < args.num_samples || (args.runtime != 0 && time(NULL) - this->start_time < args.runtime)) {
         size_t payload_len = *select_randomly(args.payload_lens.begin(), args.payload_lens.end(), args.seed);
         int delay = std::max((double) std::min((double) d(gen), 10000000.0), 0.0);
         usleep(delay);
