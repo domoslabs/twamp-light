@@ -1,6 +1,16 @@
 # Twamp Light
 
-## Installation
+## Installing a release version (v1.3.6 in the example)
+Tested on a clean Ubuntu 22.04 VM on AWS and a Ubuntu 22.04 docker image
+
+```bash
+apt update
+apt install wget
+wget https://github.com/domoslabs/twamp-light/releases/download/v1.3.6/twamp-light-1.3.6.deb
+apt install ./twamp-light-1.3.6.deb
+```
+
+## Build instructions
 Clone the repo and all its submodules:
 ```bash
 git clone --recurse-submodules https://github.com/domoslabs/twamp-light.git 
@@ -11,24 +21,22 @@ mkdir build
 cd build
 cmake ..
 make
+make install
+ldconfig
 ```
-This outputs a client and a server executable.
+This produces and installs a client and a server executable.
 
-Optional:
-```bash
-make install && ldconfig
-```
 ## Usage
-Requires root access.
 
 To show the help message:
 ```bash
 ./twamp-light-client -h
 ./twamp-light-server -h
 ```
+
 ### starting systemd service
+Make sure twamp-light-server is installed (either using apt or make install).
 ```bash
-sudo make install
 sudo systemctl daemon-reload
 sudo systemctl enable twamp-light-server.service
 sudo systemctl start twamp-light-server.service
