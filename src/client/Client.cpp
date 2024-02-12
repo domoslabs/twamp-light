@@ -295,7 +295,7 @@ void Client::check_if_oldest_packet_should_be_processed()
             delete oldest_raw_data;
         }
     }
-    if (raw_data_list->num_entries == 0 && sending_completed == 1) {
+    if (raw_data_list->num_entries == 0 && this->sending_completed > 0) {
         // All the packets have been sent and all the responses have been received or timed out
         // Close the thread
         collator_finished = 1;
