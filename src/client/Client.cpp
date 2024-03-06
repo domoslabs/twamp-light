@@ -385,19 +385,19 @@ void Client::aggregateRawData(RawData *oldest_raw_data)
         sqa_stats_add_sample(stats_server_client, &server_client_delay);
     } else {
         // We don't know where the packet was lost, so update all loss counters
-        sqa_stats_count_loss(stats_client_server);
-        sqa_stats_count_loss(stats_internal);
-        sqa_stats_count_loss(stats_server_client);
-        sqa_stats_count_loss(stats_RTT);
+        sqa_stats_count_loss(this->stats_client_server);
+        sqa_stats_count_loss(this->stats_internal);
+        sqa_stats_count_loss(this->stats_server_client);
+        sqa_stats_count_loss(this->stats_RTT);
     }
     timespec internal_delay;
     timespec rtt_delay;
 
     tspecminus(&server_client_delay, &client_server_delay, &internal_delay);
-    sqa_stats_add_sample(stats_internal, &internal_delay);
+    sqa_stats_add_sample(this->stats_internal, &internal_delay);
 
     tspecplus(&client_server_delay, &server_client_delay, &rtt_delay);
-    sqa_stats_add_sample(stats_RTT, &rtt_delay);
+    sqa_stats_add_sample(this->stats_RTT, &rtt_delay);
 }
 
 int Client::getSentPackets()
@@ -739,10 +739,10 @@ void Client::print_lost_packet(uint32_t packet_id, uint64_t initial_send_time, u
 template <typename Func> void Client::printSummaryLine(const std::string &label, Func func)
 {
     std::cout << " " << std::left << std::setw(10) << label << std::setprecision(6);
-    std::cout << func(stats_RTT) << " s      ";
-    std::cout << func(stats_client_server) << " s      ";
-    std::cout << func(stats_server_client) << " s      ";
-    std::cout << func(stats_internal) << " s\n";
+    std::cout << func(this->stats_RTT) << " s      ";
+    std::cout << func(this->stats_client_server) << " s      ";
+    std::cout << func(this->stats_server_client) << " s      ";
+    std::cout << func(this->stats_internal) << " s\n";
     fflush(stdout);
 }
 
