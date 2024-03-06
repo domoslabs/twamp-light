@@ -375,14 +375,14 @@ void Client::aggregateRawData(RawData *oldest_raw_data)
     if (oldest_raw_data->client_send_epoch_nanoseconds > 0 && oldest_raw_data->server_receive_epoch_nanoseconds > 0) {
         client_server_delay = nanosecondsToTimespec(oldest_raw_data->server_receive_epoch_nanoseconds -
                                                     oldest_raw_data->client_send_epoch_nanoseconds);
-        sqa_stats_add_sample(stats_client_server, &client_server_delay);
+        sqa_stats_add_sample(this->stats_client_server, &client_server_delay);
     }
     timespec server_client_delay = {};
     if (oldest_raw_data->server_send_epoch_nanoseconds > 0 && oldest_raw_data->client_receive_epoch_nanoseconds > 0 &&
         oldest_raw_data->server_receive_epoch_nanoseconds > 0 && oldest_raw_data->client_send_epoch_nanoseconds > 0) {
         server_client_delay = nanosecondsToTimespec(oldest_raw_data->client_receive_epoch_nanoseconds -
                                                     oldest_raw_data->server_send_epoch_nanoseconds);
-        sqa_stats_add_sample(stats_server_client, &server_client_delay);
+        sqa_stats_add_sample(this->stats_server_client, &server_client_delay);
     } else {
         // We don't know where the packet was lost, so update all loss counters
         sqa_stats_count_loss(this->stats_client_server);
@@ -394,10 +394,14 @@ void Client::aggregateRawData(RawData *oldest_raw_data)
     timespec rtt_delay;
 
     tspecminus(&server_client_delay, &client_server_delay, &internal_delay);
-    sqa_stats_add_sample(this->stats_internal, &internal_delay);
+    if (tspecmsec(&internal_delay) != 0) {
+        sqa_stats_add_sample(this->stats_internal, &internal_delay);
+    }
 
     tspecplus(&client_server_delay, &server_client_delay, &rtt_delay);
-    sqa_stats_add_sample(this->stats_RTT, &rtt_delay);
+    if (tspecmsec(&rtt_delay) != 0) {
+        sqa_stats_add_sample(this->stats_RTT, &rtt_delay);
+    }
 }
 
 int Client::getSentPackets()
