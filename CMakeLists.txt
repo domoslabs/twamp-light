@@ -10,6 +10,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wextra -Wall -O0 -g")
 # set(CMAKE_CXX_FLAGS_RELEASE "-Werror -O2")
 include(cmake/getversion.cmake)
 
+option(SYSTEMD_UNIT "Include Systemd unit in install" ON)
 option(USE_ASAN "Build with address-sanitizer" OFF)
 option(RUN_TESTS "Build and run tests" ON)
 option(USE_LEGACY_TIMESTAMP_IN_CLIENT OFF)
@@ -90,4 +91,6 @@ endif()
 install(TARGETS ${CLIENT_TARGET} ${SERVER_TARGET} 
         RUNTIME DESTINATION bin)
 
-install(FILES systemd/twamp-light-server.service DESTINATION /lib/systemd/system) 
+if (SYSTEMD_UNIT) 
+	install(FILES systemd/twamp-light-server.service DESTINATION /lib/systemd/system) 
+endif()
