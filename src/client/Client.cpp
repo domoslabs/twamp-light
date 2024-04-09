@@ -548,7 +548,8 @@ void populateMetricData(MetricData &data,
                         uint16_t local_port,
                         uint16_t port,
                         ssize_t payload_len,
-                        TimeData &timeData)
+                        TimeData &timeData,
+                        struct sqa_stats *stats)
 {
     data.ip = host;
     data.sending_port = local_port;
@@ -561,6 +562,8 @@ void populateMetricData(MetricData &data,
     data.server_client_delay = timeData.server_client_delay;
     data.client_server_delay = timeData.client_server_delay;
     data.rtt_delay = timeData.rtt;
+    data.packets_sent = uint64_t(stats->number_of_samples);
+    data.packets_lost = uint64_t(stats->number_of_lost_packets);
 }
 
 void Client::enqueue_observation(struct qed_observation *obs)
@@ -627,14 +630,15 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket,
     enqueue_observation(obs2);
     enqueue_observation(obs1);
     if (args.print_format == "legacy") {
-        printReflectorPacket(reflectorPacket, msghdr, payload_len, incoming_timestamp_nanoseconds);
+        printReflectorPacket(reflectorPacket, msghdr, payload_len, incoming_timestamp_nanoseconds, this->stats_client_server);
     }
 }
 
 void Client::printReflectorPacket(ReflectorPacket *reflectorPacket,
                                   msghdr msghdr,
                                   ssize_t payload_len,
-                                  uint64_t incoming_timestamp_nanoseconds)
+                                  uint64_t incoming_timestamp_nanoseconds,
+                                  struct sqa_stats *stats)
 {
     uint64_t client_receive_time = incoming_timestamp_nanoseconds;
     IPHeader ipHeader = get_ip_header(msghdr);
@@ -645,7 +649,7 @@ void Client::printReflectorPacket(ReflectorPacket *reflectorPacket,
     TimeData timeData = computeTimeData(args.sync_time, client_receive_time, reflectorPacket, timeSynchronizer);
 
     MetricData data;
-    populateMetricData(data, reflectorPacket, ipHeader, host, local_port, port, payload_len, timeData);
+    populateMetricData(data, reflectorPacket, ipHeader, host, local_port, port, payload_len, timeData, stats);
 
     if (args.print_RTT_only) {
         std::cout << std::fixed << (double) timeData.rtt / 1e-6 << "\n";
@@ -661,9 +665,11 @@ void Client::printHeader()
         std::cout << "Time" << args.sep << "IP" << args.sep << "Snd#" << args.sep << "Rcv#" << args.sep << "SndPort"
                   << args.sep << "RscPort" << args.sep << "Sync" << args.sep << "FW_TTL" << args.sep << "SW_TTL"
                   << args.sep << "SndTOS" << args.sep << "FW_TOS" << args.sep << "SW_TOS" << args.sep << "RTT"
-                  << args.sep << "IntD" << args.sep << "FWD" << args.sep << "BWD" << args.sep << "PLEN" << args.sep
-                  << "LOSS"
-                  << "\n";
+                  << args.sep << "IntD" << args.sep << "FWD" << args.sep << "BWD" << args.sep << "PLEN";
+        if (args.print_lost_packets) {
+            std::cout  << args.sep << "SENT" << args.sep << "LOST";
+        }
+        std::cout  << "\n";
         } else if (args.print_format == "raw") {
         std::cout << "packet_id" << args.sep << "payload_len" << args.sep << "client_send_epoch_nanoseconds" << args.sep
                   << "server_receive_epoch_nanoseconds" << args.sep << "server_send_epoch_nanoseconds" << args.sep
@@ -697,8 +703,11 @@ void Client::printMetrics(const MetricData &data)
               << unsigned(data.packet.sender_tos) << args.sep << '-' << args.sep << unsigned(data.ipHeader.tos)
               << args.sep << (double) data.rtt_delay * 1e-6 // Nanoseconds to milliseconds
               << args.sep << (double) data.internal_delay * 1e-6 << args.sep << (double) data.client_server_delay * 1e-6
-              << args.sep << (double) data.server_client_delay * 1e-6 << args.sep << data.payload_length << args.sep
-              << data.packet_loss << "\n";
+              << args.sep << (double) data.server_client_delay * 1e-6 << args.sep << data.payload_length;
+    if (args.print_lost_packets) {
+        std::cout << args.sep << data.packets_sent << args.sep << data.packets_lost;
+    }
+    std::cout << "\n";
     fflush(stdout);
 }
 

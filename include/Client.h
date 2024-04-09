@@ -33,6 +33,7 @@ struct Args {
     bool sync_time = false;
     bool print_digest = false;
     bool print_RTT_only = false;
+    bool print_lost_packets = false;
     std::string print_format = "legacy";
     std::string json_output_file;
 };
@@ -72,8 +73,9 @@ struct MetricData {
     int64_t server_client_delay = 0;
     int64_t internal_delay = 0;
     int64_t rtt_delay = 0;
-    uint16_t packet_loss = 0;
     uint64_t initial_send_time = 0;
+    uint64_t packets_sent = 0;
+    uint64_t packets_lost = 0;
     ReflectorPacket packet;
     IPHeader ipHeader;
 };
@@ -132,7 +134,8 @@ class Client {
     void printReflectorPacket(ReflectorPacket *reflectorPacket,
                               msghdr msghdr,
                               ssize_t payload_len,
-                              uint64_t incoming_timestamp_nanoseconds);
+                              uint64_t incoming_timestamp_nanoseconds,
+                              struct sqa_stats *stats);
 
     template <typename Func> void printSummaryLine(const std::string &label, Func func);
 
