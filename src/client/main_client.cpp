@@ -34,6 +34,7 @@ Args parse_args(int argc, char **argv)
     app.add_option("-s, --seed", args.seed, "Seed for the RNG. 0 means random.");
     app.add_flag("--print-digest{true}", args.print_digest, "Prints a statistical summary at the end.");
     app.add_option("-j, --json-output", args.json_output_file, "Filename to dump json output to");
+    app.add_flag("--print-lost-packets", args.print_lost_packets, "Prints sent and lost packet counters, legacy format only");
     app.add_option("--print-RTT-only", args.print_RTT_only, "Prints only the RTT values.");
     app.add_option("--print-format",
                    args.print_format,
@@ -110,7 +111,7 @@ int main(int argc, char **argv)
     std::thread receiver_thread(&Client::runReceiverThread, &client);
     std::thread sender_thread(&Client::runSenderThread, &client);
     client.printHeader();
-    if (args.print_format != "legacy") {
+    if (args.print_format != "legacy" || args.print_lost_packets) {
         client.runCollatorThread();
     }
     sender_thread.join();
