@@ -162,9 +162,11 @@ void Client::runSenderThread()
                 first_packet_sent_epoch_nanoseconds = timestamp_to_nsec(&sent_time);
             }
             last_packet_sent_epoch_nanoseconds = timestamp_to_nsec(&sent_time);
-            struct qed_observation *obs =
-            make_qed_observation(ObservationPoints::CLIENT_SEND, timestamp_to_nsec(&sent_time), index, payload_len);
-            enqueue_observation(obs);
+            if (this->collator_started) {
+                struct qed_observation *obs =
+                make_qed_observation(ObservationPoints::CLIENT_SEND, timestamp_to_nsec(&sent_time), index, payload_len);
+                enqueue_observation(obs);
+            }
         }   
         catch (const std::exception& e) { // catch error from sendPacket
             std::cerr << e.what() << std::endl;
@@ -183,7 +185,7 @@ void Client::runReceiverThread()
     otherwise run until all packets have been received (or timed out) */
     while ((args.num_samples == 0 || 
     this->sending_completed == 0 ||
-    (this->last_received_packet_id < (args.num_samples - 1) && time(NULL) - this->sending_completed > args.timeout))) 
+    (this->last_received_packet_id < (args.num_samples - 1) && time(NULL) - this->sending_completed < args.timeout))) 
     {
         awaitAndHandleResponse();
     }
@@ -305,6 +307,7 @@ void Client::check_if_oldest_packet_should_be_processed()
 /* Processes observations recorded by the sender and the receiver */
 void Client::runCollatorThread()
 {
+    this->collator_started = 1;
     // Consumes the observation queue and generates a table.
     // Uses semaphore to wake the thread only when there are observations to consume.
     while (collator_finished == 0) {
@@ -614,21 +617,23 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket,
     // uint16_t local_port = atoi(args.local_port.c_str());
     uint32_t packet_id = ntohl(reflectorPacket->seq_number);
     this->last_received_packet_id = packet_id;
-    struct qed_observation *obs1 =
-        make_qed_observation(ObservationPoints::CLIENT_RECEIVE, incoming_timestamp_nanoseconds, packet_id, payload_len);
-    struct qed_observation *obs2 = make_qed_observation(ObservationPoints::SERVER_RECEIVE,
-                                                        timestamp_to_nsec(&server_receive_time),
-                                                        packet_id,
-                                                        payload_len);
-    struct qed_observation *obs3 = make_qed_observation(ObservationPoints::SERVER_SEND,
-                                                        timestamp_to_nsec(&server_send_time),
-                                                        packet_id,
-                                                        payload_len);
+    if (this->collator_started) {
+        struct qed_observation *obs1 =
+            make_qed_observation(ObservationPoints::CLIENT_RECEIVE, incoming_timestamp_nanoseconds, packet_id, payload_len);
+        struct qed_observation *obs2 = make_qed_observation(ObservationPoints::SERVER_RECEIVE,
+                                                            timestamp_to_nsec(&server_receive_time),
+                                                            packet_id,
+                                                            payload_len);
+        struct qed_observation *obs3 = make_qed_observation(ObservationPoints::SERVER_SEND,
+                                                            timestamp_to_nsec(&server_send_time),
+                                                            packet_id,
+                                                            payload_len);
 
-    // Queue all observations in the FIFO to the collator
-    enqueue_observation(obs3);
-    enqueue_observation(obs2);
-    enqueue_observation(obs1);
+        // Queue all observations in the FIFO to the collator
+        enqueue_observation(obs3);
+        enqueue_observation(obs2);
+        enqueue_observation(obs1);
+    }
     if (args.print_format == "legacy") {
         printReflectorPacket(reflectorPacket, msghdr, payload_len, incoming_timestamp_nanoseconds, this->stats_client_server);
     }
