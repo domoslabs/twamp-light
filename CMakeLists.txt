@@ -12,7 +12,7 @@ include(cmake/getversion.cmake)
 
 option(USE_ASAN "Build with address-sanitizer" OFF)
 option(RUN_TESTS "Build and run tests" ON)
-option(USE_LEGACY_TIMESTAMP_IN_CLIENT OFF)
+option(USE_LEGACY_TIMESTAMP_IN_CLIENT "Build without NIC timestamping in the client" OFF)
 if (USE_LEGACY_TIMESTAMP_IN_CLIENT)
   add_definitions(-DKERNEL_TIMESTAMP_DISABLED_IN_CLIENT)
 endif ()
@@ -90,4 +90,4 @@ endif()
 install(TARGETS ${CLIENT_TARGET} ${SERVER_TARGET} 
         RUNTIME DESTINATION bin)
 
-install(FILES systemd/twamp-light-server.service DESTINATION /lib/systemd/system) 
+install(FILES systemd/twamp-light-server.service DESTINATION /lib/systemd/system)
