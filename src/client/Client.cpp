@@ -162,18 +162,18 @@ void Client::runSenderThread()
                 first_packet_sent_epoch_nanoseconds = timestamp_to_nsec(&sent_time);
             }
             last_packet_sent_epoch_nanoseconds = timestamp_to_nsec(&sent_time);
+            this->sent_packets += 1;
             if (this->collator_started) {
                 struct qed_observation *obs =
                 make_qed_observation(ObservationPoints::CLIENT_SEND, timestamp_to_nsec(&sent_time), index, payload_len);
                 enqueue_observation(obs);
             }
-        }   
+        }
         catch (const std::exception& e) { // catch error from sendPacket
             std::cerr << e.what() << std::endl;
         }
         index++;
     }
-    this->sent_packets = index;
     this->sending_completed = time(NULL);
 }
 
