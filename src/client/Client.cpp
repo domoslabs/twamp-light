@@ -162,7 +162,6 @@ void Client::runSenderThread()
                 first_packet_sent_epoch_nanoseconds = timestamp_to_nsec(&sent_time);
             }
             last_packet_sent_epoch_nanoseconds = timestamp_to_nsec(&sent_time);
-            this->sent_packets += 1;
             if (this->collator_started) {
                 struct qed_observation *obs =
                 make_qed_observation(ObservationPoints::CLIENT_SEND, timestamp_to_nsec(&sent_time), index, payload_len);
@@ -185,7 +184,7 @@ void Client::runReceiverThread()
     otherwise run until all packets have been received (or timed out) */
     while ((args.num_samples == 0 || 
     this->sending_completed == 0 ||
-    (this->last_received_packet_id < (args.num_samples - 1) && time(NULL) - this->sending_completed < args.timeout))) 
+    (this->received_packets < this->sent_packets && time(NULL) - this->sending_completed < args.timeout))) 
     {
         awaitAndHandleResponse();
     }
@@ -430,6 +429,8 @@ Timestamp Client::sendPacket(uint32_t idx, size_t payload_len)
         if (sendmsg(fd, &message, 0) == -1) {
             std::cerr << strerror(errno) << std::endl;
             throw std::runtime_error(std::string("Sending UDP message failed with error."));
+        } else {
+            this->sent_packets += 1;
         }
     }
     return ntohts(senderPacket.send_time_data);
@@ -617,6 +618,7 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket,
     // uint16_t local_port = atoi(args.local_port.c_str());
     uint32_t packet_id = ntohl(reflectorPacket->seq_number);
     this->last_received_packet_id = packet_id;
+    this->received_packets += 1;
     if (this->collator_started) {
         struct qed_observation *obs1 =
             make_qed_observation(ObservationPoints::CLIENT_RECEIVE, incoming_timestamp_nanoseconds, packet_id, payload_len);
