@@ -604,7 +604,7 @@ void Client::handleReflectorPacket(ReflectorPacket *reflectorPacket,
         incoming_timestamp_nanoseconds = timestamp_to_nsec(&client_receive_time);
     } else {
         // Convert timespec to timestamp
-        incoming_timestamp_nanoseconds = incoming_timestamp->tv_sec * 1000000000 + incoming_timestamp->tv_nsec;
+        incoming_timestamp_nanoseconds = (uint64_t)incoming_timestamp->tv_sec * 1000000000 + incoming_timestamp->tv_nsec;
     }
     last_packet_received_epoch_nanoseconds = incoming_timestamp_nanoseconds;
 
